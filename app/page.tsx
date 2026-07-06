@@ -1,10 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
+import BottomNav from "@/components/BottomNav";
 import { PLATFORMS, type ParsedShift, type Platform } from "@/lib/shift";
+import { addShift, listShifts, type Shift } from "@/lib/storage";
+import { computeStreak, formatYen, hourlyRate, todayIso } from "@/lib/stats";
 
-// 縦一本スライス: スクショをアップロード → AI解析 → 結果表示(+手動修正)。
-// 確定した記録は当面メモリ上に保持する(Supabase接続は次ステップ)。
+// 記録フロー: スクショをアップロード → AI解析 → 確認・修正 → 保存。
+// 解析失敗時・APIキー未設定時は手動入力フォームにフォールバックする。
 
 type FormValues = {
   platform: Platform | "";
@@ -12,14 +16,6 @@ type FormValues = {
   revenue_yen: string;
   deliveries: string;
   minutes_worked: string;
-};
-
-type ConfirmedShift = {
-  platform: Platform;
-  date: string;
-  revenue_yen: number;
-  deliveries: number | null;
-  minutes_worked: number | null;
 };
 
 const EMPTY_FORM: FormValues = {
@@ -31,7 +27,7 @@ const EMPTY_FORM: FormValues = {
 };
 
 // 解析コストとアップロード時間を抑えるため、長辺が上限を超える画像は
-// クライアント側で縮小してから送る(Sonnetの高解像度上限に合わせる)。
+// クライアント側で縮小してから送る。
 const MAX_LONG_EDGE = 2576;
 
 async function toUploadBlob(file: File): Promise<Blob> {
@@ -45,20 +41,19 @@ async function toUploadBlob(file: File): Promise<Blob> {
   if (!ctx) return file;
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   return new Promise((resolve) =>
-    canvas.toBlob(
-      (blob) => resolve(blob ?? file),
-      "image/jpeg",
-      0.9,
-    ),
+    canvas.toBlob((blob) => resolve(blob ?? file), "image/jpeg", 0.9),
   );
 }
 
-function formatYen(n: number): string {
-  return `¥${n.toLocaleString("ja-JP")}`;
-}
-
-function hourlyRate(revenueYen: number, minutes: number): number {
-  return Math.round((revenueYen / minutes) * 60);
+function buildShareQuery(shift: Shift, streak: number): string {
+  const params = new URLSearchParams({
+    dt: shift.date,
+    r: String(shift.revenue_yen),
+    st: String(streak),
+  });
+  if (shift.deliveries != null) params.set("d", String(shift.deliveries));
+  if (shift.minutes_worked != null) params.set("m", String(shift.minutes_worked));
+  return params.toString();
 }
 
 export default function Home() {
@@ -67,17 +62,22 @@ export default function Home() {
   >("idle");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [form, setForm] = useState<FormValues>(EMPTY_FORM);
+  const [source, setSource] = useState<"screenshot" | "manual">("manual");
   const [notice, setNotice] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<ParsedShift["confidence"] | null>(
     null,
   );
-  const [confirmed, setConfirmed] = useState<ConfirmedShift[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState<{ shift: Shift; streak: number } | null>(
+    null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
     setStatus("parsing");
     setNotice(null);
     setConfidence(null);
+    setSource("manual");
     setPreviewUrl((old) => {
       if (old) URL.revokeObjectURL(old);
       return URL.createObjectURL(file);
@@ -116,6 +116,7 @@ export default function Home() {
         deliveries: result.deliveries?.toString() ?? "",
         minutes_worked: result.minutes_worked?.toString() ?? "",
       });
+      setSource("screenshot");
       setConfidence(result.confidence);
       if (result.notes) setNotice(result.notes);
       setStatus("review");
@@ -126,19 +127,29 @@ export default function Home() {
     }
   }
 
-  function handleConfirm() {
-    if (!form.platform || !form.date || !form.revenue_yen) return;
-    setConfirmed((list) => [
-      {
+  async function handleConfirm() {
+    if (!form.platform || !form.date || !form.revenue_yen || saving) return;
+    setSaving(true);
+    setNotice(null);
+    try {
+      const shift = await addShift({
         platform: form.platform as Platform,
         date: form.date,
         revenue_yen: Number(form.revenue_yen),
         deliveries: form.deliveries ? Number(form.deliveries) : null,
         minutes_worked: form.minutes_worked ? Number(form.minutes_worked) : null,
-      },
-      ...list,
-    ]);
-    setStatus("confirmed");
+        source,
+      });
+      const all = await listShifts();
+      setSaved({ shift, streak: computeStreak(all, todayIso()) });
+      setStatus("confirmed");
+    } catch (err) {
+      setNotice(
+        err instanceof Error ? err.message : "保存に失敗しました。もう一度お試しください。",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   function reset() {
@@ -146,6 +157,8 @@ export default function Home() {
     setForm(EMPTY_FORM);
     setNotice(null);
     setConfidence(null);
+    setSource("manual");
+    setSaved(null);
     setPreviewUrl((old) => {
       if (old) URL.revokeObjectURL(old);
       return null;
@@ -157,7 +170,6 @@ export default function Home() {
   const minutesNum = Number(form.minutes_worked);
   const showHourly =
     form.revenue_yen !== "" && form.minutes_worked !== "" && minutesNum > 0;
-
   const canConfirm = Boolean(form.platform && form.date && form.revenue_yen);
 
   const inputClass =
@@ -165,7 +177,7 @@ export default function Home() {
   const labelClass = "mb-1 block text-xs font-medium text-white/50";
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-16 pt-8">
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-28 pt-8">
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">
           Deli<span className="text-orange-500">Log</span>
@@ -229,6 +241,7 @@ export default function Home() {
             onClick={() => {
               setForm(EMPTY_FORM);
               setNotice(null);
+              setSource("manual");
               setStatus("review");
             }}
           >
@@ -352,11 +365,11 @@ export default function Home() {
 
             <button
               type="button"
-              disabled={!canConfirm}
-              onClick={handleConfirm}
+              disabled={!canConfirm || saving}
+              onClick={() => void handleConfirm()}
               className="w-full rounded-xl bg-orange-500 py-3.5 text-base font-bold text-white transition active:bg-orange-600 disabled:opacity-30"
             >
-              この内容で記録する
+              {saving ? "保存中…" : "この内容で記録する"}
             </button>
             <button
               type="button"
@@ -369,62 +382,50 @@ export default function Home() {
         </section>
       )}
 
-      {status === "confirmed" && confirmed[0] && (
+      {status === "confirmed" && saved && (
         <section>
           <div className="rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-500/15 to-transparent p-6 text-center">
             <p className="text-sm font-medium text-orange-400">記録しました 🎉</p>
             <p className="mt-3 text-4xl font-black tracking-tight">
-              {formatYen(confirmed[0].revenue_yen)}
+              {formatYen(saved.shift.revenue_yen)}
             </p>
             <p className="mt-2 text-sm text-white/60">
-              {confirmed[0].date} ・{" "}
-              {PLATFORMS.find((p) => p.value === confirmed[0].platform)?.label}
-              {confirmed[0].deliveries != null && ` ・ ${confirmed[0].deliveries}件`}
+              {saved.shift.date} ・{" "}
+              {PLATFORMS.find((p) => p.value === saved.shift.platform)?.label}
+              {saved.shift.deliveries != null && ` ・ ${saved.shift.deliveries}件`}
             </p>
-            {confirmed[0].minutes_worked != null &&
-              confirmed[0].minutes_worked > 0 && (
-                <p className="mt-1 text-sm text-white/60">
-                  時給換算{" "}
-                  {formatYen(
-                    hourlyRate(
-                      confirmed[0].revenue_yen,
-                      confirmed[0].minutes_worked,
-                    ),
-                  )}
-                </p>
-              )}
+            {saved.shift.minutes_worked != null && saved.shift.minutes_worked > 0 && (
+              <p className="mt-1 text-sm text-white/60">
+                時給換算{" "}
+                {formatYen(
+                  hourlyRate(saved.shift.revenue_yen, saved.shift.minutes_worked),
+                )}
+              </p>
+            )}
+            {saved.streak > 1 && (
+              <p className="mt-3 text-sm font-semibold text-orange-400">
+                🔥 連続稼働 {saved.streak}日目
+              </p>
+            )}
           </div>
-          <p className="mt-3 text-center text-xs text-white/30">
-            ※ 保存機能は準備中。今はこの画面を閉じると消えます
-          </p>
+
+          <Link
+            href={`/s?${buildShareQuery(saved.shift, saved.streak)}`}
+            className="mt-6 block w-full rounded-xl bg-orange-500 py-3.5 text-center text-base font-bold text-white active:bg-orange-600"
+          >
+            シェアカードを作る
+          </Link>
           <button
             type="button"
             onClick={reset}
-            className="mt-6 w-full rounded-xl bg-white/10 py-3.5 text-base font-semibold text-white active:bg-white/15"
+            className="mt-3 w-full rounded-xl bg-white/10 py-3.5 text-base font-semibold text-white active:bg-white/15"
           >
             次のスクショを読み取る
           </button>
         </section>
       )}
 
-      {confirmed.length > 1 && status === "confirmed" && (
-        <section className="mt-8">
-          <h3 className="mb-2 text-xs font-medium text-white/40">このセッションの記録</h3>
-          <ul className="space-y-2">
-            {confirmed.slice(1).map((s, i) => (
-              <li
-                key={i}
-                className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm"
-              >
-                <span className="text-white/60">
-                  {s.date} ・ {PLATFORMS.find((p) => p.value === s.platform)?.label}
-                </span>
-                <span className="font-semibold">{formatYen(s.revenue_yen)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <BottomNav />
     </main>
   );
 }
