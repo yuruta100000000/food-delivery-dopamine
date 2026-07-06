@@ -20,8 +20,8 @@
 ## 技術スタック(変更しない)
 
 - Next.js (App Router) + TypeScript + Tailwind CSS
-- Supabase: Auth(まずGoogle/匿名)、Postgres、Storage(スクショ画像)
-- Anthropic API: スクショ解析(claude-sonnet系、構造化JSON出力)
+- Supabase: Auth(まずGoogle/匿名)、Postgres、Storage(スクショ画像)。未設定時はlocalStorageにフォールバック
+- OpenAI API: スクショ解析(gpt-4.1-mini既定・`OPENAI_MODEL`で変更可、structured outputs)※2026-07-06 オーナー判断でAnthropicから変更
 - Recharts(グラフ) / @vercel/og または satori(シェアカード画像生成)
 - Vercel デプロイ
 - 決済(W4で追加): Stripe Payment Links(実装最小)

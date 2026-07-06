@@ -9,52 +9,65 @@
 
 ```bash
 npm install
-cp .env.example .env.local   # ANTHROPIC_API_KEY を設定
+cp .env.example .env.local   # OPENAI_API_KEY を設定
 npm run dev
 ```
 
-`ANTHROPIC_API_KEY` 未設定でも起動する(AI解析は失敗し、手動入力フォームにフォールバック)。
-動作確認は必ずiPhone幅(390px)で行うこと。
+- `OPENAI_API_KEY` 未設定でも起動する(AI解析は失敗し、手動入力フォームにフォールバック)
+- Supabase未設定時、記録は端末のlocalStorageに保存される(1人で使う分には十分)
+- 動作確認は必ずiPhone幅(390px)で行うこと
 
-## MVP実装計画(〜2026-08-04)
+### Vercelに設定する環境変数
 
-### ✅ Step 1: 縦一本スライス「スクショ → AI解析 → 結果表示」(今ここ)
-- スクショアップロード(クライアント側で長辺2576pxに縮小してから送信)
-- `/api/parse`: Claude(claude-sonnet-5, vision + structured outputs)で
-  日付・プラットフォーム・売上・件数・稼働時間を抽出
-- 解析結果を修正可能なフォームに表示 → 確定(現状メモリ保持のみ)
-- 解析失敗・API未設定・売上画面でない画像 → 手動入力フォームにフォールバック
-- プロンプトは `prompts/parse-screenshot.ts` に分離(UI変更時はここだけ差し替え)
+| 変数 | 必須 | 用途 |
+|---|---|---|
+| `OPENAI_API_KEY` | ✅ | スクショ解析 |
+| `OPENAI_MODEL` | — | 解析モデル(省略時 gpt-4.1-mini) |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | — | クラウド保存(未設定ならlocalStorage) |
+| `SUPABASE_SERVICE_ROLE_KEY` | — | parse_logs(解析生ログ)の保存 |
+| `NEXT_PUBLIC_STRIPE_PAYMENT_LINK` | — | 応援プランボタン(W4の課金導線) |
 
-### Step 2: Supabase接続(永続化)
-- Auth: 匿名ログイン → Googleログイン
-- `shifts` テーブルに確定データを保存 / `parse_logs` に解析生出力を必ず保存
-- Storage にスクショ原本を保存(`raw_screenshot_url`)
-- 同日・同プラットフォームの重複取り込みガード
+### Supabaseを有効にする手順(任意・W3の複数ユーザー公開前に)
 
-### Step 3: ダッシュボード
-- 日/週/月の売上推移(Recharts)、プラットフォーム別内訳
-- 時給換算、連続稼働日数
-- モバイルで美しいことが最優先
+1. supabase.com でプロジェクト作成
+2. SQL Editor で `supabase/schema.sql` を実行
+3. Authentication → Sign In / Up → **Anonymous sign-ins を有効化**
+4. 上記の環境変数3つをVercelに設定して再デプロイ
 
-### Step 4: シェアカード + 課金
-- 「今日の稼働」1枚画像(@vercel/og)、Strava風
-- ワンタップX投稿導線
-- Stripe Payment Links で先行課金(月300〜500円 or 買い切り応援)→ **1円の売上**
+## MVP実装状況(〜2026-08-04)
 
-### 並行タスク(コード外)
-- Vercelデプロイは Step 1 完了時点から常時(動くURLを配達員に見せる)
-- 実スクショ(Uber/出前館/menu/ロケットナウ)で解析精度を検証し、
-  `prompts/parse-screenshot.ts` の few-shot を実データ準拠に更新
+### ✅ Step 1: スクショ → AI解析 → 結果表示
+- OpenAI(gpt-4.1-mini, vision + structured outputs)で日付・プラットフォーム・売上・件数・時間を抽出
+- 解析失敗/APIキー未設定/非売上画像 → 手動修正フォームにフォールバック
+- プロンプト+few-shotは `prompts/parse-screenshot.ts` に分離(UI変更時はここだけ差し替え)
+
+### ✅ Step 2: 保存
+- localStorage(既定)/ Supabase(env設定時・匿名Auth)の二段構え
+- 解析生出力は parse_logs に保存(Supabase設定時。未設定時はサーバーログ)
+
+### ✅ Step 3: ダッシュボード
+- 日/週/月の売上推移(Recharts)、プラットフォーム別内訳(直近30日)
+- 今日/今週/今月サマリー、時給換算(直近30日)、連続稼働日数、記録の削除
+
+### ✅ Step 4: シェアカード
+- `/api/og` でStrava風カード画像を生成(1200×630)
+- `/s` シェアページ + ワンタップX投稿導線(og:imageでタイムラインにカード展開)
+- 応援プラン導線(`NEXT_PUBLIC_STRIPE_PAYMENT_LINK` 設定で表示)
+
+### 🔜 残タスク(コードより検証)
+- [ ] 本番で実スクショ4社分を解析し、`prompts/parse-screenshot.ts` のfew-shotを実データ準拠に更新
+- [ ] Supabaseプロジェクト作成 + 環境変数設定(W3の無料登録20人前)
+- [ ] Stripe Payment Link作成 → 環境変数設定(W4)→ **1円の売上**
 
 ## 構成
 
-- Next.js (App Router) + TypeScript + Tailwind CSS
-- Anthropic API(スクショ解析)/ Supabase(Step 2〜)/ Vercel
-
 | パス | 役割 |
 |---|---|
-| `app/page.tsx` | アップロード → 解析結果の確認・修正 → 確定(モバイルファースト) |
-| `app/api/parse/route.ts` | スクショ解析API(vision + structured outputs) |
-| `prompts/parse-screenshot.ts` | 解析プロンプト + few-shot(UI変更時の差し替えポイント) |
-| `lib/shift.ts` | 稼働記録の型・zodスキーマ・JSON Schema |
+| `app/page.tsx` | 記録フロー(アップロード → 解析 → 確認・修正 → 保存) |
+| `app/dashboard/page.tsx` | ダッシュボード |
+| `app/s/page.tsx` + `app/api/og/route.tsx` | シェアページとカード画像生成 |
+| `app/api/parse/route.ts` | スクショ解析API(OpenAI vision + structured outputs) |
+| `prompts/parse-screenshot.ts` | 解析プロンプト + few-shot(差し替えポイント) |
+| `lib/storage.ts` | 保存レイヤー(localStorage / Supabase) |
+| `lib/stats.ts` | 集計(推移・内訳・時給・連続稼働) |
+| `supabase/schema.sql` | DBスキーマ(shifts / parse_logs, RLS) |
