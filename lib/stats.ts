@@ -53,6 +53,12 @@ export function shiftsBetween(
   return shifts.filter((s) => s.date >= fromIso && s.date <= toIso);
 }
 
+// その週の月曜日(週間集計・週間目標の起点)
+export function weekStartOf(today: string): string {
+  const dow = new Date(`${today}T00:00:00Z`).getUTCDay(); // 0=日
+  return addDays(today, dow === 0 ? -6 : 1 - dow);
+}
+
 // 連続稼働日数: 今日から遡って連続で記録がある日数。
 // 今日まだ記録がない場合は昨日からの連続を数える(その日の稼働前に0に見えないように)。
 export function computeStreak(shifts: Shift[], today: string): number {

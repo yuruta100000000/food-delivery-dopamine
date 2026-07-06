@@ -94,7 +94,7 @@ export default async function SharePage({
         href={intentUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-6 block w-full rounded-xl bg-orange-500 py-3.5 text-center text-base font-bold text-white active:bg-orange-600"
+        className="btn-chunky btn-orange mt-6"
       >
         Xにポストする
       </a>

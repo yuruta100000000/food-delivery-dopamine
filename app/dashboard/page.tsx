@@ -14,9 +14,11 @@ import {
 import BottomNav from "@/components/BottomNav";
 import { PLATFORMS, type Platform } from "@/lib/shift";
 import { deleteShift, listShifts, storageMode, type Shift } from "@/lib/storage";
+import { getWeeklyGoal } from "@/lib/goal";
 import {
   addDays,
   computeStreak,
+  weekStartOf,
   dailyTrend,
   formatMinutes,
   formatYen,
@@ -83,6 +85,7 @@ export default function Dashboard() {
   const [shifts, setShifts] = useState<Shift[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<Range>("day");
+  const [goal, setGoal] = useState<number | null>(null);
 
   useEffect(() => {
     listShifts()
@@ -90,14 +93,14 @@ export default function Dashboard() {
       .catch((err) =>
         setError(err instanceof Error ? err.message : "記録の取得に失敗しました"),
       );
+    setGoal(getWeeklyGoal());
   }, []);
 
   const today = todayIso();
 
   const stats = useMemo(() => {
     if (!shifts) return null;
-    const dow = new Date(`${today}T00:00:00Z`).getUTCDay();
-    const weekStart = addDays(today, dow === 0 ? -6 : 1 - dow);
+    const weekStart = weekStartOf(today);
     const monthStart = `${today.slice(0, 7)}-01`;
     const last30Start = addDays(today, -29);
     const todayShifts = shiftsOn(shifts, today);
@@ -173,6 +176,32 @@ export default function Dashboard() {
 
       {shifts && shifts.length > 0 && stats && (
         <div className="space-y-4">
+          {/* 週間目標(Studyplusの週間レポート風) */}
+          {goal != null && (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-white/50">今週の目標</span>
+                <span className="font-bold">
+                  {formatYen(stats.weekRevenue)}{" "}
+                  <span className="text-white/40">/ {formatYen(goal)}</span>
+                </span>
+              </div>
+              <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-700"
+                  style={{
+                    width: `${Math.min((stats.weekRevenue / goal) * 100, 100)}%`,
+                  }}
+                />
+              </div>
+              <p className="mt-1.5 text-xs font-semibold text-orange-400">
+                {stats.weekRevenue >= goal
+                  ? "🎉 達成!来週も更新しよう"
+                  : `あと ${formatYen(goal - stats.weekRevenue)}`}
+              </p>
+            </div>
+          )}
+
           {/* サマリータイル */}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -330,7 +359,7 @@ export default function Dashboard() {
               href={`/s?dt=${today}&r=${stats.todayRevenue}&st=${stats.streak}${
                 stats.todayMinutes > 0 ? `&m=${stats.todayMinutes}` : ""
               }`}
-              className="block w-full rounded-xl bg-orange-500 py-3.5 text-center text-base font-bold text-white active:bg-orange-600"
+              className="btn-chunky btn-orange"
             >
               今日の稼働をシェアする
             </Link>

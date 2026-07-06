@@ -1,14 +1,23 @@
 "use client";
 
-import { useRef, useState } from "react";
-import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import BottomNav from "@/components/BottomNav";
+import Celebration from "@/components/Celebration";
 import { PLATFORMS, type ParsedShift, type Platform } from "@/lib/shift";
 import { addShift, listShifts, type Shift } from "@/lib/storage";
-import { computeStreak, formatYen, hourlyRate, todayIso } from "@/lib/stats";
+import { GOAL_PRESETS, getWeeklyGoal, setWeeklyGoal } from "@/lib/goal";
+import {
+  computeStreak,
+  formatYen,
+  hourlyRate,
+  shiftsBetween,
+  sumRevenue,
+  todayIso,
+  weekStartOf,
+} from "@/lib/stats";
 
-// 記録フロー: スクショをアップロード → AI解析 → 確認・修正 → 保存。
-// 解析失敗時・APIキー未設定時は手動入力フォームにフォールバックする。
+// ホーム = 記録ファースト(Studyplus流)+ ストリークと週間目標を最前面(Duolingo流)。
+// フロー: スクショをアップロード → AI解析 → 確認・修正 → 保存 → セレブレーション。
 
 type FormValues = {
   platform: Platform | "";
@@ -26,8 +35,6 @@ const EMPTY_FORM: FormValues = {
   minutes_worked: "",
 };
 
-// 解析コストとアップロード時間を抑えるため、長辺が上限を超える画像は
-// クライアント側で縮小してから送る。
 const MAX_LONG_EDGE = 2576;
 
 async function toUploadBlob(file: File): Promise<Blob> {
@@ -56,10 +63,24 @@ function buildShareQuery(shift: Shift, streak: number): string {
   return params.toString();
 }
 
+// 保存前のシフト一覧から「今日以外の日別売上の最高額」を出す(自己ベスト判定用)
+function bestDailyBefore(shifts: Shift[], today: string): number {
+  const totals = new Map<string, number>();
+  for (const s of shifts) {
+    if (s.date === today) continue;
+    totals.set(s.date, (totals.get(s.date) ?? 0) + s.revenue_yen);
+  }
+  return Math.max(0, ...totals.values());
+}
+
 export default function Home() {
   const [status, setStatus] = useState<
-    "idle" | "parsing" | "review" | "confirmed"
+    "idle" | "parsing" | "review" | "celebrate"
   >("idle");
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [goal, setGoal] = useState<number | null>(null);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [customGoal, setCustomGoal] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [form, setForm] = useState<FormValues>(EMPTY_FORM);
   const [source, setSource] = useState<"screenshot" | "manual">("manual");
@@ -68,10 +89,27 @@ export default function Home() {
     null,
   );
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState<{ shift: Shift; streak: number } | null>(
-    null,
-  );
+  const [saved, setSaved] = useState<{
+    shift: Shift;
+    streak: number;
+    isBest: boolean;
+    weekTotal: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const today = todayIso();
+
+  useEffect(() => {
+    listShifts()
+      .then(setShifts)
+      .catch(() => setShifts([]));
+    setGoal(getWeeklyGoal());
+  }, []);
+
+  const todayTotal = sumRevenue(shifts.filter((s) => s.date === today));
+  const weekTotal = sumRevenue(shiftsBetween(shifts, weekStartOf(today), today));
+  const streak = computeStreak(shifts, today);
+  const goalPct = goal ? Math.min((weekTotal / goal) * 100, 100) : 0;
 
   async function handleFile(file: File) {
     setStatus("parsing");
@@ -132,6 +170,7 @@ export default function Home() {
     setSaving(true);
     setNotice(null);
     try {
+      const prevBest = bestDailyBefore(shifts, today);
       const shift = await addShift({
         platform: form.platform as Platform,
         date: form.date,
@@ -141,8 +180,16 @@ export default function Home() {
         source,
       });
       const all = await listShifts();
-      setSaved({ shift, streak: computeStreak(all, todayIso()) });
-      setStatus("confirmed");
+      setShifts(all);
+      const newStreak = computeStreak(all, today);
+      const savedDayTotal = sumRevenue(all.filter((s) => s.date === shift.date));
+      setSaved({
+        shift,
+        streak: newStreak,
+        isBest: prevBest > 0 && savedDayTotal > prevBest,
+        weekTotal: sumRevenue(shiftsBetween(all, weekStartOf(today), today)),
+      });
+      setStatus("celebrate");
     } catch (err) {
       setNotice(
         err instanceof Error ? err.message : "保存に失敗しました。もう一度お試しください。",
@@ -166,6 +213,13 @@ export default function Home() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  function applyGoal(yen: number) {
+    setWeeklyGoal(yen);
+    setGoal(yen);
+    setEditingGoal(false);
+    setCustomGoal("");
+  }
+
   const revenueNum = Number(form.revenue_yen);
   const minutesNum = Number(form.minutes_worked);
   const showHourly =
@@ -177,20 +231,125 @@ export default function Home() {
   const labelClass = "mb-1 block text-xs font-medium text-white/50";
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-28 pt-8">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-28 pt-6">
+      {/* ステータスバー: ロゴ + ストリーク(常に最前面) */}
+      <header className="mb-5 flex items-center justify-between">
+        <h1 className="text-xl font-extrabold tracking-tight">
           Deli<span className="text-orange-500">Log</span>
         </h1>
-        <p className="mt-1 text-sm text-white/50">
-          売上スクショを撮って、今日の稼働を記録しよう
-        </p>
+        <div
+          className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-extrabold ${
+            streak > 0
+              ? "bg-orange-500/15 text-orange-400"
+              : "bg-white/5 text-white/30"
+          }`}
+        >
+          <span className={streak > 0 ? "anim-flame" : ""}>🔥</span>
+          {streak > 0 ? `${streak}日` : "0日"}
+        </div>
       </header>
 
       {(status === "idle" || status === "parsing") && (
-        <section>
+        <section className="space-y-4">
+          {/* 今日 + 週間目標(Duolingoのゴールトラッカー) */}
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-xs font-medium text-white/50">今日の売上</p>
+                <p className="mt-0.5 text-3xl font-black tracking-tight">
+                  {formatYen(todayTotal)}
+                </p>
+              </div>
+              {todayTotal === 0 && (
+                <p className="text-xs font-semibold text-orange-400">
+                  今日はまだ記録してないよ👇
+                </p>
+              )}
+            </div>
+
+            <div className="mt-4">
+              {goal == null && !editingGoal ? (
+                <button
+                  type="button"
+                  onClick={() => setEditingGoal(true)}
+                  className="w-full rounded-xl border border-dashed border-orange-500/40 bg-orange-500/5 px-4 py-3 text-sm font-bold text-orange-400"
+                >
+                  🎯 週間目標を決めて、達成グセをつけよう
+                </button>
+              ) : editingGoal ? (
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <p className="mb-2 text-xs font-medium text-white/50">
+                    今週いくら稼ぐ?
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {GOAL_PRESETS.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => applyGoal(p)}
+                        className="rounded-lg bg-white/10 py-2 text-xs font-bold active:bg-orange-500/30"
+                      >
+                        {p / 10000}万
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="自由に入力(円)"
+                      className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
+                      value={customGoal}
+                      onChange={(e) => setCustomGoal(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      disabled={!Number(customGoal)}
+                      onClick={() => applyGoal(Number(customGoal))}
+                      className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-bold disabled:opacity-30"
+                    >
+                      決定
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-white/50">
+                      今週の目標 {goal != null && formatYen(goal)}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="font-bold text-white/80">
+                        {Math.floor(goalPct)}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setEditingGoal(true)}
+                        className="text-white/30 underline"
+                      >
+                        変更
+                      </button>
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-3 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-700"
+                      style={{ width: `${goalPct}%` }}
+                    />
+                  </div>
+                  {goal != null && weekTotal >= goal && (
+                    <p className="mt-1.5 text-xs font-bold text-orange-400">
+                      🎉 今週の目標達成!
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 記録CTA */}
           <label
-            className={`flex aspect-[4/3] w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed transition ${
+            className={`flex w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed px-6 py-10 transition ${
               status === "parsing"
                 ? "border-orange-500/40 bg-orange-500/5"
                 : "border-white/15 bg-white/5 active:bg-white/10"
@@ -219,17 +378,17 @@ export default function Home() {
                 )}
                 <div className="flex items-center gap-2 text-orange-400">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-orange-400 border-t-transparent" />
-                  <span className="text-sm font-medium">AIが読み取り中…</span>
+                  <span className="text-sm font-bold">AIが読み取り中…</span>
                 </div>
               </>
             ) : (
               <>
-                <span className="text-4xl">📸</span>
-                <span className="text-base font-semibold">
-                  売上画面のスクショをアップロード
+                <span className="anim-flame text-5xl">📸</span>
+                <span className="text-lg font-extrabold">
+                  スクショで今日を記録
                 </span>
                 <span className="text-xs text-white/40">
-                  Uber Eats / 出前館 / menu / ロケットナウ
+                  売上画面を選ぶだけ・約5秒
                 </span>
               </>
             )}
@@ -237,7 +396,7 @@ export default function Home() {
 
           <button
             type="button"
-            className="mt-4 w-full rounded-xl border border-white/10 py-3 text-sm text-white/60 active:bg-white/5"
+            className="btn-chunky btn-ghost"
             onClick={() => {
               setForm(EMPTY_FORM);
               setNotice(null);
@@ -245,18 +404,18 @@ export default function Home() {
               setStatus("review");
             }}
           >
-            スクショなしで手動入力する
+            手動で入力する
           </button>
         </section>
       )}
 
       {status === "review" && (
-        <section>
+        <section className="anim-rise">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">内容を確認</h2>
+            <h2 className="text-lg font-extrabold">内容を確認</h2>
             {confidence && (
               <span
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                className={`rounded-full px-3 py-1 text-xs font-bold ${
                   confidence === "high"
                     ? "bg-emerald-500/15 text-emerald-400"
                     : confidence === "medium"
@@ -295,7 +454,7 @@ export default function Home() {
                     onClick={() => setForm({ ...form, platform: p.value })}
                     className={`rounded-xl border px-2 py-2.5 text-sm transition ${
                       form.platform === p.value
-                        ? "border-orange-500 bg-orange-500/15 font-semibold text-orange-400"
+                        ? "border-orange-500 bg-orange-500/15 font-bold text-orange-400"
                         : "border-white/10 bg-white/5 text-white/70"
                     }`}
                   >
@@ -357,7 +516,7 @@ export default function Home() {
             {showHourly && (
               <p className="text-right text-sm text-white/50">
                 時給換算{" "}
-                <span className="font-semibold text-orange-400">
+                <span className="font-bold text-orange-400">
                   {formatYen(hourlyRate(revenueNum, minutesNum))}
                 </span>
               </p>
@@ -367,7 +526,7 @@ export default function Home() {
               type="button"
               disabled={!canConfirm || saving}
               onClick={() => void handleConfirm()}
-              className="w-full rounded-xl bg-orange-500 py-3.5 text-base font-bold text-white transition active:bg-orange-600 disabled:opacity-30"
+              className="btn-chunky btn-orange"
             >
               {saving ? "保存中…" : "この内容で記録する"}
             </button>
@@ -382,47 +541,16 @@ export default function Home() {
         </section>
       )}
 
-      {status === "confirmed" && saved && (
-        <section>
-          <div className="rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-500/15 to-transparent p-6 text-center">
-            <p className="text-sm font-medium text-orange-400">記録しました 🎉</p>
-            <p className="mt-3 text-4xl font-black tracking-tight">
-              {formatYen(saved.shift.revenue_yen)}
-            </p>
-            <p className="mt-2 text-sm text-white/60">
-              {saved.shift.date} ・{" "}
-              {PLATFORMS.find((p) => p.value === saved.shift.platform)?.label}
-              {saved.shift.deliveries != null && ` ・ ${saved.shift.deliveries}件`}
-            </p>
-            {saved.shift.minutes_worked != null && saved.shift.minutes_worked > 0 && (
-              <p className="mt-1 text-sm text-white/60">
-                時給換算{" "}
-                {formatYen(
-                  hourlyRate(saved.shift.revenue_yen, saved.shift.minutes_worked),
-                )}
-              </p>
-            )}
-            {saved.streak > 1 && (
-              <p className="mt-3 text-sm font-semibold text-orange-400">
-                🔥 連続稼働 {saved.streak}日目
-              </p>
-            )}
-          </div>
-
-          <Link
-            href={`/s?${buildShareQuery(saved.shift, saved.streak)}`}
-            className="mt-6 block w-full rounded-xl bg-orange-500 py-3.5 text-center text-base font-bold text-white active:bg-orange-600"
-          >
-            シェアカードを作る
-          </Link>
-          <button
-            type="button"
-            onClick={reset}
-            className="mt-3 w-full rounded-xl bg-white/10 py-3.5 text-base font-semibold text-white active:bg-white/15"
-          >
-            次のスクショを読み取る
-          </button>
-        </section>
+      {status === "celebrate" && saved && (
+        <Celebration
+          shiftRevenue={saved.shift.revenue_yen}
+          streak={saved.streak}
+          isPersonalBest={saved.isBest}
+          weekTotal={saved.weekTotal}
+          weeklyGoal={goal}
+          shareHref={`/s?${buildShareQuery(saved.shift, saved.streak)}`}
+          onNext={reset}
+        />
       )}
 
       <BottomNav />
