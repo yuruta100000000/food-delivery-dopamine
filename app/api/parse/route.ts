@@ -1,13 +1,13 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
 import { buildSystemPrompt, buildUserText } from "@/prompts/parse-screenshot";
 import { parsedShiftSchema, parsedShiftJsonSchema } from "@/lib/shift";
+import { saveParseLog } from "@/lib/supabase-server";
 
-// スクショ解析API: 画像を受け取り Claude(vision)で構造化して返す。
+// スクショ解析API: 画像を受け取り OpenAI(vision + structured outputs)で構造化して返す。
 // 個人情報注意: スクショには注文者情報が写り込む可能性がある。
-// このAPIは売上関連フィールドのみを抽出・返却し、画像そのものは保存しない
-// (Supabase Storage 導入後も、保存するのは画像と売上フィールドのみで、
-//  注文者情報のテキスト抽出は行わない方針)。
+// このAPIは売上関連フィールドのみを抽出・返却し、画像そのものは保存しない。
+// 注文者情報のテキスト抽出は行わない方針(プロンプト側でも明示)。
 
 const SUPPORTED_MEDIA_TYPES = [
   "image/jpeg",
@@ -16,14 +16,15 @@ const SUPPORTED_MEDIA_TYPES = [
   "image/gif",
 ] as const;
 
-type SupportedMediaType = (typeof SUPPORTED_MEDIA_TYPES)[number];
+// 精度と費用のバランスはモデルで調整する。Vercelの環境変数 OPENAI_MODEL で差し替え可能
+const DEFAULT_MODEL = "gpt-4.1-mini";
 
 export async function POST(req: NextRequest) {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
       {
         error:
-          "AI解析が未設定です(ANTHROPIC_API_KEY がありません)。手動入力で記録できます。",
+          "AI解析が未設定です(OPENAI_API_KEY がありません)。手動入力で記録できます。",
       },
       { status: 503 },
     );
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const mediaType = file.type as SupportedMediaType;
+  const mediaType = file.type as (typeof SUPPORTED_MEDIA_TYPES)[number];
   if (!SUPPORTED_MEDIA_TYPES.includes(mediaType)) {
     return NextResponse.json(
       {
@@ -60,45 +61,48 @@ export async function POST(req: NextRequest) {
     timeZone: "Asia/Tokyo",
   });
 
-  const client = new Anthropic();
+  const model = process.env.OPENAI_MODEL || DEFAULT_MODEL;
+  const client = new OpenAI();
 
   try {
-    const response = await client.messages.create({
-      model: "claude-sonnet-5",
-      max_tokens: 2048,
-      system: buildSystemPrompt(),
-      output_config: {
-        format: {
-          type: "json_schema",
-          schema: parsedShiftJsonSchema,
-        },
-      },
+    const response = await client.chat.completions.create({
+      model,
+      max_completion_tokens: 2048,
       messages: [
+        { role: "system", content: buildSystemPrompt() },
         {
           role: "user",
           content: [
             {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: mediaType,
-                data: imageBase64,
+              type: "image_url",
+              image_url: {
+                url: `data:${mediaType};base64,${imageBase64}`,
+                detail: "high",
               },
             },
             { type: "text", text: buildUserText(todayIso) },
           ],
         },
       ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "parsed_shift",
+          strict: true,
+          schema: parsedShiftJsonSchema as unknown as Record<string, unknown>,
+        },
+      },
     });
 
-    if (response.stop_reason === "refusal") {
+    const choice = response.choices[0];
+    if (choice?.message.refusal) {
       return NextResponse.json(
         { error: "この画像は解析できませんでした。手動入力してください。" },
         { status: 422 },
       );
     }
 
-    const rawText = response.content.find((b) => b.type === "text")?.text;
+    const rawText = choice?.message.content;
     if (!rawText) {
       return NextResponse.json(
         { error: "解析結果を取得できませんでした。手動入力してください。" },
@@ -106,11 +110,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // TODO(Supabase導入時): 解析の生出力を parse_logs テーブルに必ず保存する
-    // (プロンプト改善用)。それまではサーバーログに残す。
-    console.log("[parse_log]", JSON.stringify({ at: new Date().toISOString(), rawText }));
+    // 解析の生出力は parse_logs に必ず残す(プロンプト改善用)。
+    // Supabase未設定時はサーバーログのみ。
+    await saveParseLog({ model, rawText });
 
-    const parsed = parsedShiftSchema.safeParse(JSON.parse(rawText));
+    const raw = JSON.parse(rawText);
+    // strict mode都合で platform の「不明」は "unknown" で受けている → null に正規化
+    if (raw.platform === "unknown") raw.platform = null;
+
+    const parsed = parsedShiftSchema.safeParse(raw);
     if (!parsed.success) {
       console.error("[parse] schema validation failed", parsed.error.issues);
       return NextResponse.json(
@@ -121,14 +129,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ result: parsed.data });
   } catch (err) {
-    if (err instanceof Anthropic.RateLimitError) {
+    if (err instanceof OpenAI.RateLimitError) {
       return NextResponse.json(
         { error: "アクセスが集中しています。少し待ってから再試行してください。" },
         { status: 429 },
       );
     }
-    if (err instanceof Anthropic.APIError) {
-      console.error("[parse] Anthropic API error", err.status, err.message);
+    if (err instanceof OpenAI.APIError) {
+      console.error("[parse] OpenAI API error", err.status, err.message);
       return NextResponse.json(
         { error: "AI解析でエラーが発生しました。手動入力してください。" },
         { status: 502 },

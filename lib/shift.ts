@@ -31,8 +31,10 @@ export const parsedShiftSchema = z.object({
 
 export type ParsedShift = z.infer<typeof parsedShiftSchema>;
 
-// Claude APIの structured outputs に渡す JSON Schema。
-// zodスキーマと必ず同期させること(検証はzod側で行う)。
+// OpenAI structured outputs(strict mode)に渡す JSON Schema。
+// strict modeの制約(enumにnull不可等)のため、platformの「不明」は
+// "unknown" で受けてサーバー側で null に変換する。
+// zodスキーマ(parsedShiftSchema)と必ず同期させること(最終検証はzod側)。
 export const parsedShiftJsonSchema = {
   type: "object",
   properties: {
@@ -41,13 +43,14 @@ export const parsedShiftJsonSchema = {
       description: "画像がデリバリーアプリの売上・稼働画面として読み取れたか",
     },
     platform: {
-      type: ["string", "null"],
-      enum: ["uber", "demaecan", "menu", "rocketnow", "other", null],
-      description: "配達プラットフォーム。判別できなければnull",
+      type: "string",
+      enum: ["uber", "demaecan", "menu", "rocketnow", "other", "unknown"],
+      description: "配達プラットフォーム。判別できなければ unknown",
     },
     date: {
       type: ["string", "null"],
-      description: "稼働日 YYYY-MM-DD。画面に年がない場合は基準日から補完。不明ならnull",
+      description:
+        "稼働日 YYYY-MM-DD(ゼロ埋め)。画面に年がない場合は基準日から補完。不明ならnull",
     },
     revenue_yen: {
       type: ["integer", "null"],
