@@ -129,14 +129,41 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ result: parsed.data });
   } catch (err) {
-    if (err instanceof OpenAI.RateLimitError) {
-      return NextResponse.json(
-        { error: "アクセスが集中しています。少し待ってから再試行してください。" },
-        { status: 429 },
-      );
-    }
     if (err instanceof OpenAI.APIError) {
-      console.error("[parse] OpenAI API error", err.status, err.message);
+      console.error(
+        "[parse] OpenAI API error",
+        JSON.stringify({ status: err.status, code: err.code, message: err.message }),
+      );
+      // OpenAIは残高不足も429で返すため、コードで切り分けて正しい対処を伝える
+      if (err.code === "insufficient_quota") {
+        return NextResponse.json(
+          {
+            error:
+              "OpenAIのクレジット残高が不足しています。platform.openai.com の Billing でチャージしてください。",
+          },
+          { status: 502 },
+        );
+      }
+      if (err.status === 429) {
+        return NextResponse.json(
+          { error: "AIが混み合っています。少し待ってから再試行してください。" },
+          { status: 429 },
+        );
+      }
+      if (err.status === 401) {
+        return NextResponse.json(
+          { error: "OPENAI_API_KEY が無効です。Vercelの環境変数を確認してください。" },
+          { status: 502 },
+        );
+      }
+      if (err.status === 404) {
+        return NextResponse.json(
+          {
+            error: `モデル「${model}」が利用できません。環境変数 OPENAI_MODEL を変更してください。`,
+          },
+          { status: 502 },
+        );
+      }
       return NextResponse.json(
         { error: "AI解析でエラーが発生しました。手動入力してください。" },
         { status: 502 },
