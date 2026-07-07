@@ -13,6 +13,7 @@ export type Shift = {
   revenue_yen: number;
   deliveries: number | null;
   minutes_worked: number | null;
+  distance_km: number | null;
   source: "screenshot" | "manual";
   created_at: string;
 };
@@ -74,7 +75,7 @@ export async function listShifts(): Promise<Shift[]> {
   await ensureSession(client);
   const { data, error } = await client
     .from("shifts")
-    .select("id, date, platform, revenue_yen, deliveries, minutes_worked, source, created_at")
+    .select("id, date, platform, revenue_yen, deliveries, minutes_worked, distance_km, source, created_at")
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) throw new Error(`記録の取得に失敗しました: ${error.message}`);
@@ -96,7 +97,7 @@ export async function addShift(input: ShiftInput): Promise<Shift> {
   const { data, error } = await client
     .from("shifts")
     .insert(input)
-    .select("id, date, platform, revenue_yen, deliveries, minutes_worked, source, created_at")
+    .select("id, date, platform, revenue_yen, deliveries, minutes_worked, distance_km, source, created_at")
     .single();
   if (error) throw new Error(`記録の保存に失敗しました: ${error.message}`);
   return data as Shift;

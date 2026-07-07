@@ -41,6 +41,36 @@ export function sumMinutes(shifts: Shift[]): number {
   return shifts.reduce((acc, s) => acc + (s.minutes_worked ?? 0), 0);
 }
 
+export function sumDistance(shifts: Shift[]): number {
+  return (
+    Math.round(shifts.reduce((acc, s) => acc + (s.distance_km ?? 0), 0) * 10) / 10
+  );
+}
+
+// 直近N日の日別走行距離
+export function dailyDistance(
+  shifts: Shift[],
+  today: string,
+  days: number,
+): { key: string; total: number }[] {
+  const totals = new Map<string, number>();
+  const keys: string[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = addDays(today, -i);
+    keys.push(date);
+    totals.set(date, 0);
+  }
+  for (const s of shifts) {
+    if (totals.has(s.date)) {
+      totals.set(s.date, totals.get(s.date)! + (s.distance_km ?? 0));
+    }
+  }
+  return keys.map((d) => ({
+    key: `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`,
+    total: Math.round(totals.get(d)! * 10) / 10,
+  }));
+}
+
 export function shiftsOn(shifts: Shift[], dateIso: string): Shift[] {
   return shifts.filter((s) => s.date === dateIso);
 }

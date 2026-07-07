@@ -12,6 +12,7 @@ create table public.shifts (
   revenue_yen integer not null check (revenue_yen >= 0),
   deliveries integer check (deliveries >= 0),
   minutes_worked integer check (minutes_worked >= 0),
+  distance_km numeric(6, 1) check (distance_km >= 0),
   source text not null default 'manual' check (source in ('screenshot', 'manual')),
   raw_screenshot_url text,
   created_at timestamptz not null default now()

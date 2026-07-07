@@ -25,6 +25,7 @@ export const parsedShiftSchema = z.object({
   revenue_yen: z.number().int().nonnegative().nullable(),
   deliveries: z.number().int().nonnegative().nullable(),
   minutes_worked: z.number().int().nonnegative().nullable(),
+  distance_km: z.number().nonnegative().nullable(),
   confidence: z.enum(["high", "medium", "low"]),
   notes: z.string().nullable(),
 });
@@ -64,6 +65,10 @@ export const parsedShiftJsonSchema = {
       type: ["integer", "null"],
       description: "稼働時間(分)。オンライン時間があれば優先。不明ならnull",
     },
+    distance_km: {
+      type: ["number", "null"],
+      description: "走行距離(km・小数可)。画面に表示があれば。なければnull",
+    },
     confidence: {
       type: "string",
       enum: ["high", "medium", "low"],
@@ -81,6 +86,7 @@ export const parsedShiftJsonSchema = {
     "revenue_yen",
     "deliveries",
     "minutes_worked",
+    "distance_km",
     "confidence",
     "notes",
   ],
