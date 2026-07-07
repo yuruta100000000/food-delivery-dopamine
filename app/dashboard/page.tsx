@@ -12,13 +12,16 @@ import {
   YAxis,
 } from "recharts";
 import BottomNav from "@/components/BottomNav";
+import ProgressRing from "@/components/ProgressRing";
 import { PLATFORMS, type Platform } from "@/lib/shift";
 import { deleteShift, listShifts, storageMode, type Shift } from "@/lib/storage";
 import { getWeeklyGoal } from "@/lib/goal";
+import { computeLevel } from "@/lib/level";
 import {
   addDays,
   computeStreak,
   weekStartOf,
+  dailyDistance,
   dailyTrend,
   formatMinutes,
   formatYen,
@@ -27,6 +30,7 @@ import {
   platformBreakdown,
   shiftsBetween,
   shiftsOn,
+  sumDistance,
   sumMinutes,
   sumRevenue,
   todayIso,
@@ -114,6 +118,9 @@ export default function Dashboard() {
       streak: computeStreak(shifts, today),
       breakdown: platformBreakdown(last30),
       breakdownTotal: sumRevenue(last30),
+      distance30: sumDistance(last30),
+      distanceTrend: dailyDistance(shifts, today, 14),
+      level: computeLevel(sumRevenue(shifts)),
     };
   }, [shifts, today]);
 
@@ -159,7 +166,7 @@ export default function Dashboard() {
       )}
 
       {shifts && shifts.length === 0 && (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+        <div className="glass p-8 text-center">
           <p className="text-3xl">📈</p>
           <p className="mt-3 font-semibold">まだ記録がありません</p>
           <p className="mt-1 text-sm text-white/50">
@@ -176,9 +183,33 @@ export default function Dashboard() {
 
       {shifts && shifts.length > 0 && stats && (
         <div className="space-y-4">
+          {/* レベルカード */}
+          <div className="glass flex items-center gap-4 p-4">
+            <ProgressRing size={72} stroke={7} progress={stats.level.progress}>
+              <span className="num text-xl font-black leading-none">
+                {stats.level.level}
+              </span>
+              <span className="text-[8px] font-bold tracking-widest text-white/40">
+                LV
+              </span>
+            </ProgressRing>
+            <div className="min-w-0 flex-1">
+              <p className="font-extrabold text-amber-300">{stats.level.title}</p>
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500"
+                  style={{ width: `${stats.level.progress * 100}%` }}
+                />
+              </div>
+              <p className="num mt-1 text-[11px] text-white/40">
+                次のレベルまで {formatYen(stats.level.toNext)}
+              </p>
+            </div>
+          </div>
+
           {/* 週間目標(Studyplusの週間レポート風) */}
           {goal != null && (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="glass p-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-white/50">今週の目標</span>
                 <span className="font-bold">
@@ -204,7 +235,7 @@ export default function Dashboard() {
 
           {/* サマリータイル */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="glass p-4">
               <p className="text-xs text-white/50">今日の売上</p>
               <p className="mt-1 text-2xl font-black tracking-tight">
                 {formatYen(stats.todayRevenue)}
@@ -215,19 +246,19 @@ export default function Dashboard() {
                 </p>
               )}
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="glass p-4">
               <p className="text-xs text-white/50">連続稼働</p>
               <p className="mt-1 text-2xl font-black tracking-tight">
                 {stats.streak > 0 ? `🔥 ${stats.streak}日` : "—"}
               </p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="glass p-4">
               <p className="text-xs text-white/50">今週</p>
               <p className="mt-1 text-xl font-bold tracking-tight">
                 {formatYen(stats.weekRevenue)}
               </p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="glass p-4">
               <p className="text-xs text-white/50">今月</p>
               <p className="mt-1 text-xl font-bold tracking-tight">
                 {formatYen(stats.monthRevenue)}
@@ -235,17 +266,23 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {stats.hourly != null && (
-            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-sm text-white/50">時給換算(直近30日)</p>
-              <p className="text-lg font-bold text-orange-400">
-                {formatYen(stats.hourly)}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="glass p-4">
+              <p className="text-xs text-white/50">時給換算(30日)</p>
+              <p className="num mt-1 text-xl font-bold text-orange-400">
+                {stats.hourly != null ? formatYen(stats.hourly) : "—"}
               </p>
             </div>
-          )}
+            <div className="glass p-4">
+              <p className="text-xs text-white/50">走行距離(30日)</p>
+              <p className="num mt-1 text-xl font-bold">
+                {stats.distance30 > 0 ? `${stats.distance30}km` : "—"}
+              </p>
+            </div>
+          </div>
 
           {/* 売上推移 */}
-          <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <section className="glass p-4">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold">売上推移</h2>
               <div className="flex rounded-lg bg-white/5 p-0.5">
@@ -311,9 +348,59 @@ export default function Dashboard() {
             </div>
           </section>
 
+          {/* 走行距離(直近14日) */}
+          {stats.distanceTrend.some((d) => d.total > 0) && (
+            <section className="glass p-4">
+              <h2 className="mb-3 text-sm font-semibold">走行距離(直近14日)</h2>
+              <div className="h-36">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={stats.distanceTrend}
+                    margin={{ top: 4, right: 0, bottom: 0, left: 0 }}
+                  >
+                    <CartesianGrid vertical={false} stroke={GRID} strokeWidth={1} />
+                    <XAxis
+                      dataKey="key"
+                      tick={{ fill: MUTED, fontSize: 10 }}
+                      axisLine={{ stroke: AXIS }}
+                      tickLine={false}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      width={38}
+                      tick={{ fill: MUTED, fontSize: 10 }}
+                      tickFormatter={(v: number) => `${v}km`}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }) =>
+                        active && payload?.length ? (
+                          <div className="rounded-lg border border-white/10 bg-[#22242a] px-3 py-2 text-xs shadow-lg">
+                            <p className="text-white/50">{label}</p>
+                            <p className="mt-0.5 text-sm font-semibold text-white">
+                              {payload[0].value}km
+                            </p>
+                          </div>
+                        ) : null
+                      }
+                      cursor={{ fill: "rgba(255,255,255,0.06)" }}
+                    />
+                    <Bar
+                      dataKey="total"
+                      fill="#199e70"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={26}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+          )}
+
           {/* プラットフォーム別内訳 */}
           {stats.breakdown.length > 0 && stats.breakdownTotal > 0 && (
-            <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <section className="glass p-4">
               <h2 className="mb-3 text-sm font-semibold">
                 プラットフォーム別(直近30日)
               </h2>
@@ -389,6 +476,7 @@ export default function Dashboard() {
                         {s.minutes_worked != null &&
                           s.minutes_worked > 0 &&
                           ` ・ ${formatMinutes(s.minutes_worked)}`}
+                        {s.distance_km != null && ` ・ ${s.distance_km}km`}
                       </p>
                     </div>
                   </div>

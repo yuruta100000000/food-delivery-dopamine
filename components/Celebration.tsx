@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import ProgressRing from "@/components/ProgressRing";
 import { formatYen } from "@/lib/stats";
+import type { LevelInfo, Milestone } from "@/lib/level";
 
-// 記録完了セレブレーション(Duolingoのレッスン完了画面のメカニクスを移植)。
-// 称賛コピー + カウントアップ + 紙吹雪 + ストリーク + 週間目標進捗 → シェア導線。
+// 記録完了セレブレーション。
+// レベルアップ時は豪華演出(リング+光の帯+大量紙吹雪)、実績解除はカードで積む。
 
 const PRAISES = [
   "ナイス稼働!",
@@ -40,6 +42,9 @@ type Props = {
   isPersonalBest: boolean;
   weekTotal: number;
   weeklyGoal: number | null;
+  levelBefore: LevelInfo;
+  levelAfter: LevelInfo;
+  milestones: Milestone[];
   shareHref: string;
   onNext: () => void;
 };
@@ -50,27 +55,37 @@ export default function Celebration({
   isPersonalBest,
   weekTotal,
   weeklyGoal,
+  levelBefore,
+  levelAfter,
+  milestones,
   shareHref,
   onNext,
 }: Props) {
   const displayed = useCountUp(shiftRevenue);
+  const leveledUp = levelAfter.level > levelBefore.level;
   const praise = useMemo(
     () => PRAISES[Math.floor(Math.random() * PRAISES.length)],
     [],
   );
-  const confetti = useMemo(
-    () =>
-      Array.from({ length: 18 }, (_, i) => ({
-        left: `${(i * 137) % 100}%`,
-        delay: `${((i * 53) % 90) / 100}s`,
-        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-      })),
-    [],
-  );
+  const confetti = useMemo(() => {
+    const count = leveledUp ? 28 : 18;
+    return Array.from({ length: count }, (_, i) => ({
+      left: `${(i * 137) % 100}%`,
+      delay: `${((i * 53) % 140) / 100}s`,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+    }));
+  }, [leveledUp]);
 
   const goalReached = weeklyGoal != null && weekTotal >= weeklyGoal;
   const goalPct =
     weeklyGoal != null ? Math.min((weekTotal / weeklyGoal) * 100, 100) : 0;
+
+  let delay = 0.25;
+  const nextDelay = () => {
+    const d = delay;
+    delay += 0.15;
+    return `${d}s`;
+  };
 
   return (
     <section className="relative">
@@ -82,11 +97,41 @@ export default function Celebration({
         />
       ))}
 
-      <div className="anim-pop rounded-3xl border border-orange-500/30 bg-gradient-to-b from-orange-500/20 to-transparent p-6 text-center">
+      {/* レベルアップ演出(最優先の豪華枠) */}
+      {leveledUp && (
+        <div className="anim-pop anim-glow shine relative mb-4 overflow-hidden rounded-3xl border border-amber-400/40 bg-gradient-to-b from-amber-500/25 via-orange-500/10 to-transparent p-6 text-center">
+          <p className="text-grad text-2xl font-black tracking-widest">
+            LEVEL UP!
+          </p>
+          <div className="mt-4 flex items-center justify-center">
+            <ProgressRing size={128} stroke={10} progress={levelAfter.progress}>
+              <span className="text-[10px] font-bold tracking-widest text-white/50">
+                LV
+              </span>
+              <span className="num text-5xl font-black leading-none">
+                {levelAfter.level}
+              </span>
+            </ProgressRing>
+          </div>
+          <p className="mt-3 text-lg font-extrabold text-amber-300">
+            {levelAfter.title}
+          </p>
+          {levelAfter.title !== levelBefore.title && (
+            <p className="mt-1 text-xs text-white/50">
+              称号が「{levelBefore.title}」から進化!
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 売上ヒーロー */}
+      <div
+        className={`rounded-3xl border border-orange-500/30 bg-gradient-to-b from-orange-500/20 to-transparent p-6 text-center ${leveledUp ? "anim-rise" : "anim-pop"}`}
+      >
         <p className="text-lg font-extrabold text-orange-400">
           {isPersonalBest ? "🏆 自己ベスト更新!" : praise}
         </p>
-        <p className="mt-3 text-5xl font-black tracking-tight tabular-nums">
+        <p className="num mt-3 text-5xl font-black tracking-tight">
           {formatYen(displayed)}
         </p>
         {streak > 0 && (
@@ -98,11 +143,60 @@ export default function Celebration({
         )}
       </div>
 
+      {/* XPバー */}
+      <div
+        className="glass anim-rise mt-4 p-4"
+        style={{ animationDelay: nextDelay() }}
+      >
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-bold text-white/70">
+            LV.{levelAfter.level}{" "}
+            <span className="font-medium text-white/40">{levelAfter.title}</span>
+          </span>
+          <span className="num font-bold text-amber-400">
+            +{shiftRevenue.toLocaleString("ja-JP")} XP
+          </span>
+        </div>
+        <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="anim-bar h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500"
+            style={{
+              width: `${levelAfter.progress * 100}%`,
+              animationDelay: nextDelay(),
+            }}
+          />
+        </div>
+        <p className="mt-1.5 text-right text-[11px] text-white/35">
+          次のレベルまで {formatYen(levelAfter.toNext)}
+        </p>
+      </div>
+
+      {/* 実績解除 */}
+      {milestones.map((m) => (
+        <div
+          key={m.id}
+          className="glass anim-rise mt-3 flex items-center gap-3 border-amber-400/30 p-4"
+          style={{ animationDelay: nextDelay() }}
+        >
+          <span className="text-3xl">{m.emoji}</span>
+          <div>
+            <p className="text-[10px] font-bold tracking-widest text-amber-400">
+              実績解除
+            </p>
+            <p className="font-extrabold">{m.label}</p>
+          </div>
+        </div>
+      ))}
+
+      {/* 週間目標 */}
       {weeklyGoal != null && (
-        <div className="anim-rise mt-4 rounded-2xl border border-white/10 bg-white/5 p-4" style={{ animationDelay: "0.3s" }}>
+        <div
+          className="glass anim-rise mt-4 p-4"
+          style={{ animationDelay: nextDelay() }}
+        >
           <div className="flex items-center justify-between text-sm">
             <span className="text-white/60">今週の目標</span>
-            <span className="font-bold">
+            <span className="num font-bold">
               {formatYen(weekTotal)}{" "}
               <span className="text-white/40">/ {formatYen(weeklyGoal)}</span>
             </span>
@@ -110,7 +204,7 @@ export default function Celebration({
           <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/10">
             <div
               className="anim-bar h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400"
-              style={{ width: `${goalPct}%`, animationDelay: "0.4s" }}
+              style={{ width: `${goalPct}%`, animationDelay: nextDelay() }}
             />
           </div>
           <p className="mt-2 text-xs font-semibold text-orange-400">
@@ -121,11 +215,7 @@ export default function Celebration({
         </div>
       )}
 
-      <Link
-        href={shareHref}
-        className="btn-chunky btn-orange mt-6"
-        style={{ animationDelay: "0.5s" }}
-      >
+      <Link href={shareHref} className="btn-chunky btn-orange mt-6">
         この稼働をシェアする
       </Link>
       <button type="button" onClick={onNext} className="btn-chunky btn-ghost mt-3">

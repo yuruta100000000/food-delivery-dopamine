@@ -27,6 +27,9 @@ export async function GET(req: NextRequest) {
   const deliveries = clampInt(params.get("d"), 999);
   const minutes = clampInt(params.get("m"), 24 * 60);
   const streak = clampInt(params.get("st"), 9999);
+  const level = clampInt(params.get("lv"), 999);
+  const kmRaw = Number(params.get("k"));
+  const km = Number.isFinite(kmRaw) && kmRaw > 0 ? Math.min(kmRaw, 999) : 0;
 
   const dateParam = params.get("dt") ?? "";
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(dateParam);
@@ -43,6 +46,7 @@ export async function GET(req: NextRequest) {
       label: "PER HOUR",
       value: `¥${Math.round((revenue / minutes) * 60).toLocaleString("en-US")}`,
     });
+  if (km > 0) statItems.push({ label: "DISTANCE", value: `${km}km` });
   if (streak > 1) statItems.push({ label: "STREAK", value: `${streak} days` });
 
   return new ImageResponse(
@@ -69,9 +73,26 @@ export async function GET(req: NextRequest) {
             alignItems: "center",
           }}
         >
-          <div style={{ display: "flex", fontSize: 40, fontWeight: 700 }}>
-            <span>Deli</span>
-            <span style={{ color: "#f97316" }}>Log</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <div style={{ display: "flex", fontSize: 40, fontWeight: 700 }}>
+              <span>Deli</span>
+              <span style={{ color: "#f97316" }}>Log</span>
+            </div>
+            {level > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  fontSize: 24,
+                  fontWeight: 700,
+                  color: "#fbbf24",
+                  border: "2px solid rgba(251,191,36,0.4)",
+                  borderRadius: 999,
+                  padding: "4px 18px",
+                }}
+              >
+                LV.{level}
+              </div>
+            )}
           </div>
           <div
             style={{

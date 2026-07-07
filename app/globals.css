@@ -5,21 +5,50 @@
 }
 
 body {
-  background: #0d0f12;
+  background-color: #07080c;
+  background-image:
+    radial-gradient(ellipse 90% 45% at 15% -10%, rgba(249, 115, 22, 0.16), transparent 60%),
+    radial-gradient(ellipse 70% 40% at 110% 15%, rgba(57, 135, 229, 0.1), transparent 60%),
+    radial-gradient(ellipse 80% 50% at 50% 115%, rgba(249, 115, 22, 0.07), transparent 60%);
+  background-attachment: fixed;
   color: #f2f4f6;
   -webkit-font-smoothing: antialiased;
 }
 
-/* --- Duolingo風チャンキーボタン(押し込みエフェクト) --- */
+/* 数字用: iOSではSF Pro Roundedになり、Strava/Duolingo的な柔らかい太字数字になる */
+.num {
+  font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ガラス質カード */
+.glass {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.5rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* グラデーション文字 */
+.text-grad {
+  background: linear-gradient(135deg, #fdba74 0%, #f97316 55%, #ea580c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* --- チャンキーボタン(押し込み+グロー) --- */
 
 .btn-chunky {
   display: block;
   width: 100%;
-  border-radius: 1rem;
-  padding: 0.95rem 1rem;
+  border-radius: 1.1rem;
+  padding: 1rem;
   text-align: center;
   font-weight: 800;
-  font-size: 1rem;
+  font-size: 1.05rem;
   letter-spacing: 0.02em;
   transition:
     transform 0.06s ease,
@@ -28,35 +57,38 @@ body {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-
 .btn-chunky:active {
   transform: translateY(4px);
 }
-
 .btn-chunky:disabled {
   opacity: 0.35;
   transform: none;
 }
 
 .btn-orange {
-  background: #f97316;
+  background: linear-gradient(180deg, #fb923c 0%, #f97316 100%);
   color: #fff;
-  box-shadow: 0 4px 0 #c2410c;
+  box-shadow:
+    0 4px 0 #c2410c,
+    0 12px 32px rgba(249, 115, 22, 0.35);
 }
 .btn-orange:active {
-  box-shadow: 0 0 0 #c2410c;
+  box-shadow:
+    0 0 0 #c2410c,
+    0 6px 18px rgba(249, 115, 22, 0.3);
 }
 .btn-orange:disabled {
   box-shadow: 0 4px 0 #c2410c;
 }
 
 .btn-ghost {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
   color: #fff;
-  box-shadow: 0 4px 0 rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 0 rgba(255, 255, 255, 0.1);
 }
 .btn-ghost:active {
-  box-shadow: 0 0 0 rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 rgba(255, 255, 255, 0.1);
 }
 
 /* --- アニメーション(刺激レイヤー) --- */
@@ -140,12 +172,53 @@ body {
   animation: bar-fill 0.9s ease-out both;
 }
 
+/* レベルアップ演出: 光の帯が走る */
+@keyframes shine-sweep {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(240%) skewX(-18deg);
+  }
+}
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent
+  );
+  animation: shine-sweep 1.6s ease-in-out 0.4s 2;
+  pointer-events: none;
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 40px rgba(249, 115, 22, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 90px rgba(249, 115, 22, 0.55);
+  }
+}
+.anim-glow {
+  animation: glow-pulse 1.8s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anim-pop,
   .anim-rise,
   .anim-flame,
   .confetti,
-  .anim-bar {
+  .anim-bar,
+  .anim-glow {
     animation: none;
+  }
+  .shine::after {
+    display: none;
   }
 }

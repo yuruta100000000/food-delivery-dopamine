@@ -11,16 +11,18 @@ const TABS = [
 export default function BottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-[#0d0f12]/95 backdrop-blur">
-      <div className="mx-auto flex max-w-md">
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/8 bg-[#07080c]/80 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-md gap-2 px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {TABS.map((tab) => {
           const active = pathname === tab.href;
           return (
             <Link
               key={tab.href}
               href={tab.href}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-xs ${
-                active ? "font-semibold text-orange-400" : "text-white/40"
+              className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-2 text-xs transition ${
+                active
+                  ? "bg-orange-500/15 font-extrabold text-orange-400"
+                  : "text-white/40"
               }`}
             >
               <span className="text-lg leading-none">{tab.icon}</span>

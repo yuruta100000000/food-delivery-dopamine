@@ -3,9 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import BottomNav from "@/components/BottomNav";
 import Celebration from "@/components/Celebration";
+import ProgressRing from "@/components/ProgressRing";
 import { PLATFORMS, type ParsedShift, type Platform } from "@/lib/shift";
 import { addShift, listShifts, type Shift } from "@/lib/storage";
 import { GOAL_PRESETS, getWeeklyGoal, setWeeklyGoal } from "@/lib/goal";
+import {
+  aggregate,
+  computeLevel,
+  newlyUnlocked,
+  type LevelInfo,
+  type Milestone,
+} from "@/lib/level";
 import {
   computeStreak,
   formatYen,
@@ -16,7 +24,7 @@ import {
   weekStartOf,
 } from "@/lib/stats";
 
-// ホーム = 記録ファースト(Studyplus流)+ ストリークと週間目標を最前面(Duolingo流)。
+// ホーム = 記録ファースト。ストリーク・週間目標リング・レベルを最前面に。
 // フロー: スクショをアップロード → AI解析 → 確認・修正 → 保存 → セレブレーション。
 
 type FormValues = {
@@ -25,6 +33,7 @@ type FormValues = {
   revenue_yen: string;
   deliveries: string;
   minutes_worked: string;
+  distance_km: string;
 };
 
 const EMPTY_FORM: FormValues = {
@@ -33,6 +42,7 @@ const EMPTY_FORM: FormValues = {
   revenue_yen: "",
   deliveries: "",
   minutes_worked: "",
+  distance_km: "",
 };
 
 const MAX_LONG_EDGE = 2576;
@@ -52,14 +62,16 @@ async function toUploadBlob(file: File): Promise<Blob> {
   );
 }
 
-function buildShareQuery(shift: Shift, streak: number): string {
+function buildShareQuery(shift: Shift, streak: number, level: number): string {
   const params = new URLSearchParams({
     dt: shift.date,
     r: String(shift.revenue_yen),
     st: String(streak),
+    lv: String(level),
   });
   if (shift.deliveries != null) params.set("d", String(shift.deliveries));
   if (shift.minutes_worked != null) params.set("m", String(shift.minutes_worked));
+  if (shift.distance_km != null) params.set("k", String(shift.distance_km));
   return params.toString();
 }
 
@@ -94,6 +106,9 @@ export default function Home() {
     streak: number;
     isBest: boolean;
     weekTotal: number;
+    levelBefore: LevelInfo;
+    levelAfter: LevelInfo;
+    milestones: Milestone[];
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -109,7 +124,8 @@ export default function Home() {
   const todayTotal = sumRevenue(shifts.filter((s) => s.date === today));
   const weekTotal = sumRevenue(shiftsBetween(shifts, weekStartOf(today), today));
   const streak = computeStreak(shifts, today);
-  const goalPct = goal ? Math.min((weekTotal / goal) * 100, 100) : 0;
+  const level = computeLevel(sumRevenue(shifts));
+  const goalProgress = goal ? weekTotal / goal : 0;
 
   async function handleFile(file: File) {
     setStatus("parsing");
@@ -153,6 +169,7 @@ export default function Home() {
         revenue_yen: result.revenue_yen?.toString() ?? "",
         deliveries: result.deliveries?.toString() ?? "",
         minutes_worked: result.minutes_worked?.toString() ?? "",
+        distance_km: result.distance_km?.toString() ?? "",
       });
       setSource("screenshot");
       setConfidence(result.confidence);
@@ -170,6 +187,7 @@ export default function Home() {
     setSaving(true);
     setNotice(null);
     try {
+      const aggBefore = aggregate(shifts, today);
       const prevBest = bestDailyBefore(shifts, today);
       const shift = await addShift({
         platform: form.platform as Platform,
@@ -177,17 +195,21 @@ export default function Home() {
         revenue_yen: Number(form.revenue_yen),
         deliveries: form.deliveries ? Number(form.deliveries) : null,
         minutes_worked: form.minutes_worked ? Number(form.minutes_worked) : null,
+        distance_km: form.distance_km ? Number(form.distance_km) : null,
         source,
       });
       const all = await listShifts();
       setShifts(all);
-      const newStreak = computeStreak(all, today);
+      const aggAfter = aggregate(all, today);
       const savedDayTotal = sumRevenue(all.filter((s) => s.date === shift.date));
       setSaved({
         shift,
-        streak: newStreak,
+        streak: aggAfter.streak,
         isBest: prevBest > 0 && savedDayTotal > prevBest,
         weekTotal: sumRevenue(shiftsBetween(all, weekStartOf(today), today)),
+        levelBefore: computeLevel(aggBefore.totalRevenue),
+        levelAfter: computeLevel(aggAfter.totalRevenue),
+        milestones: newlyUnlocked(aggBefore, aggAfter),
       });
       setStatus("celebrate");
     } catch (err) {
@@ -232,96 +254,109 @@ export default function Home() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-28 pt-6">
-      {/* ステータスバー: ロゴ + ストリーク(常に最前面) */}
+      {/* ステータスバー: ロゴ + レベル + ストリーク */}
       <header className="mb-5 flex items-center justify-between">
-        <h1 className="text-xl font-extrabold tracking-tight">
-          Deli<span className="text-orange-500">Log</span>
+        <h1 className="text-xl font-black tracking-tight">
+          Deli<span className="text-grad">Log</span>
         </h1>
-        <div
-          className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-extrabold ${
-            streak > 0
-              ? "bg-orange-500/15 text-orange-400"
-              : "bg-white/5 text-white/30"
-          }`}
-        >
-          <span className={streak > 0 ? "anim-flame" : ""}>🔥</span>
-          {streak > 0 ? `${streak}日` : "0日"}
+        <div className="flex items-center gap-2">
+          <span className="glass num rounded-full px-3 py-1.5 text-xs font-extrabold text-amber-300">
+            LV.{level.level}
+          </span>
+          <span
+            className={`glass flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-extrabold ${
+              streak > 0 ? "text-orange-400" : "text-white/30"
+            }`}
+          >
+            <span className={streak > 0 ? "anim-flame" : ""}>🔥</span>
+            {streak}日
+          </span>
         </div>
       </header>
 
       {(status === "idle" || status === "parsing") && (
         <section className="space-y-4">
-          {/* 今日 + 週間目標(Duolingoのゴールトラッカー) */}
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-xs font-medium text-white/50">今日の売上</p>
-                <p className="mt-0.5 text-3xl font-black tracking-tight">
-                  {formatYen(todayTotal)}
-                </p>
-              </div>
-              {todayTotal === 0 && (
-                <p className="text-xs font-semibold text-orange-400">
-                  今日はまだ記録してないよ👇
-                </p>
-              )}
-            </div>
+          {/* ヒーロー: 週間目標リング */}
+          <div className="glass relative overflow-hidden p-6">
+            <div className="flex flex-col items-center">
+              <ProgressRing size={176} stroke={13} progress={goalProgress}>
+                <span className="text-[11px] font-bold tracking-widest text-white/45">
+                  今週
+                </span>
+                <span className="num text-3xl font-black tracking-tight">
+                  {formatYen(weekTotal)}
+                </span>
+                {goal != null && (
+                  <span className="num mt-0.5 text-[11px] font-bold text-orange-400">
+                    {Math.floor(goalProgress * 100)}%
+                  </span>
+                )}
+              </ProgressRing>
 
-            <div className="mt-4">
-              {goal == null && !editingGoal ? (
-                <button
-                  type="button"
-                  onClick={() => setEditingGoal(true)}
-                  className="w-full rounded-xl border border-dashed border-orange-500/40 bg-orange-500/5 px-4 py-3 text-sm font-bold text-orange-400"
-                >
-                  🎯 週間目標を決めて、達成グセをつけよう
-                </button>
-              ) : editingGoal ? (
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="mb-2 text-xs font-medium text-white/50">
-                    今週いくら稼ぐ?
-                  </p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {GOAL_PRESETS.map((p) => (
+              <div className="mt-4 w-full">
+                {goal == null && !editingGoal ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditingGoal(true)}
+                    className="w-full rounded-xl border border-dashed border-orange-500/40 bg-orange-500/5 px-4 py-3 text-sm font-bold text-orange-400"
+                  >
+                    🎯 週間目標を決めて、リングを回そう
+                  </button>
+                ) : editingGoal ? (
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <p className="mb-2 text-xs font-medium text-white/50">
+                      今週いくら稼ぐ?
+                    </p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {GOAL_PRESETS.map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => applyGoal(p)}
+                          className="num rounded-lg bg-white/10 py-2 text-xs font-bold active:bg-orange-500/30"
+                        >
+                          {p / 10000}万
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="自由に入力(円)"
+                        className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
+                        value={customGoal}
+                        onChange={(e) => setCustomGoal(e.target.value)}
+                      />
                       <button
-                        key={p}
                         type="button"
-                        onClick={() => applyGoal(p)}
-                        className="rounded-lg bg-white/10 py-2 text-xs font-bold active:bg-orange-500/30"
+                        disabled={!Number(customGoal)}
+                        onClick={() => applyGoal(Number(customGoal))}
+                        className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-bold disabled:opacity-30"
                       >
-                        {p / 10000}万
+                        決定
                       </button>
-                    ))}
+                    </div>
                   </div>
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="自由に入力(円)"
-                      className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
-                      value={customGoal}
-                      onChange={(e) => setCustomGoal(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      disabled={!Number(customGoal)}
-                      onClick={() => applyGoal(Number(customGoal))}
-                      className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-bold disabled:opacity-30"
-                    >
-                      決定
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div>
+                ) : (
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-white/50">
-                      今週の目標 {goal != null && formatYen(goal)}
+                    <span className="text-white/45">
+                      今日 <span className="num font-bold text-white/80">{formatYen(todayTotal)}</span>
+                      {todayTotal === 0 && (
+                        <span className="ml-1.5 font-semibold text-orange-400">
+                          まだ記録なし👇
+                        </span>
+                      )}
                     </span>
-                    <span className="flex items-center gap-2">
-                      <span className="font-bold text-white/80">
-                        {Math.floor(goalPct)}%
-                      </span>
+                    <span className="flex items-center gap-2 text-white/45">
+                      {goal != null &&
+                        (weekTotal >= goal ? (
+                          <span className="font-bold text-orange-400">🎉 目標達成!</span>
+                        ) : (
+                          <span>
+                            あと <span className="num font-bold text-white/80">{formatYen(goal - weekTotal)}</span>
+                          </span>
+                        ))}
                       <button
                         type="button"
                         onClick={() => setEditingGoal(true)}
@@ -331,30 +366,13 @@ export default function Home() {
                       </button>
                     </span>
                   </div>
-                  <div className="mt-1.5 h-3 overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-700"
-                      style={{ width: `${goalPct}%` }}
-                    />
-                  </div>
-                  {goal != null && weekTotal >= goal && (
-                    <p className="mt-1.5 text-xs font-bold text-orange-400">
-                      🎉 今週の目標達成!
-                    </p>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
 
           {/* 記録CTA */}
-          <label
-            className={`flex w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed px-6 py-10 transition ${
-              status === "parsing"
-                ? "border-orange-500/40 bg-orange-500/5"
-                : "border-white/15 bg-white/5 active:bg-white/10"
-            }`}
-          >
+          <label className="btn-chunky btn-orange flex cursor-pointer items-center justify-center gap-3 py-5">
             <input
               ref={fileInputRef}
               type="file"
@@ -368,31 +386,32 @@ export default function Home() {
             />
             {status === "parsing" ? (
               <>
-                {previewUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={previewUrl}
-                    alt="アップロードしたスクリーンショット"
-                    className="h-24 rounded-lg object-contain opacity-60"
-                  />
-                )}
-                <div className="flex items-center gap-2 text-orange-400">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-orange-400 border-t-transparent" />
-                  <span className="text-sm font-bold">AIが読み取り中…</span>
-                </div>
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <span>AIが読み取り中…</span>
               </>
             ) : (
               <>
-                <span className="anim-flame text-5xl">📸</span>
-                <span className="text-lg font-extrabold">
-                  スクショで今日を記録
-                </span>
-                <span className="text-xs text-white/40">
-                  売上画面を選ぶだけ・約5秒
+                <span className="text-2xl">📸</span>
+                <span>
+                  スクショで記録する
+                  <span className="block text-[11px] font-semibold text-white/70">
+                    売上画面を選ぶだけ・約5秒
+                  </span>
                 </span>
               </>
             )}
           </label>
+
+          {status === "parsing" && previewUrl && (
+            <div className="flex justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewUrl}
+                alt="アップロードしたスクリーンショット"
+                className="h-28 rounded-xl border border-white/10 object-contain opacity-70"
+              />
+            </div>
+          )}
 
           <button
             type="button"
@@ -513,14 +532,32 @@ export default function Home() {
               </div>
             </div>
 
-            {showHourly && (
-              <p className="text-right text-sm text-white/50">
-                時給換算{" "}
-                <span className="font-bold text-orange-400">
-                  {formatYen(hourlyRate(revenueNum, minutesNum))}
-                </span>
-              </p>
-            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>走行距離(km・任意)</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.1"
+                  placeholder="21.4"
+                  className={inputClass}
+                  value={form.distance_km}
+                  onChange={(e) =>
+                    setForm({ ...form, distance_km: e.target.value })
+                  }
+                />
+              </div>
+              <div className="flex items-end justify-end pb-3">
+                {showHourly && (
+                  <p className="text-sm text-white/50">
+                    時給換算{" "}
+                    <span className="num font-bold text-orange-400">
+                      {formatYen(hourlyRate(revenueNum, minutesNum))}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
 
             <button
               type="button"
@@ -548,7 +585,10 @@ export default function Home() {
           isPersonalBest={saved.isBest}
           weekTotal={saved.weekTotal}
           weeklyGoal={goal}
-          shareHref={`/s?${buildShareQuery(saved.shift, saved.streak)}`}
+          levelBefore={saved.levelBefore}
+          levelAfter={saved.levelAfter}
+          milestones={saved.milestones}
+          shareHref={`/s?${buildShareQuery(saved.shift, saved.streak, saved.levelAfter.level)}`}
           onNext={reset}
         />
       )}

@@ -14,7 +14,7 @@ function pick(params: Record<string, string | string[] | undefined>, key: string
 
 function buildOgQuery(params: Record<string, string | string[] | undefined>): string {
   const qs = new URLSearchParams();
-  for (const key of ["dt", "r", "d", "m", "st"]) {
+  for (const key of ["dt", "r", "d", "m", "st", "k", "lv"]) {
     const v = pick(params, key);
     if (v) qs.set(key, v);
   }
