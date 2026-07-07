@@ -131,7 +131,14 @@ export async function GET(req: NextRequest) {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 64 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 28,
+          }}
+        >
+          <div style={{ display: "flex", gap: 56 }}>
           {statItems.map((item) => (
             <div
               key={item.label}
@@ -159,6 +166,18 @@ export async function GET(req: NextRequest) {
               </div>
             </div>
           ))}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              fontSize: 18,
+              letterSpacing: 8,
+              color: "rgba(253,186,116,0.5)",
+              fontWeight: 700,
+            }}
+          >
+            DELIVERY IS AN ADVENTURE.
+          </div>
         </div>
       </div>
     ),

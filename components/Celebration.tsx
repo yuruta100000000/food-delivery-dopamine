@@ -126,14 +126,19 @@ export default function Celebration({
 
       {/* 売上ヒーロー */}
       <div
-        className={`rounded-3xl border border-orange-500/30 bg-gradient-to-b from-orange-500/20 to-transparent p-6 text-center ${leveledUp ? "anim-rise" : "anim-pop"}`}
+        className={`grain relative overflow-hidden rounded-3xl border border-orange-500/30 bg-gradient-to-b from-orange-500/20 to-transparent p-6 text-center ${leveledUp ? "anim-rise" : "anim-pop"}`}
       >
-        <p className="text-lg font-extrabold text-orange-400">
-          {isPersonalBest ? "🏆 自己ベスト更新!" : praise}
+        <div className="stars" aria-hidden />
+        <p className="kicker relative text-orange-400/80">QUEST COMPLETE</p>
+        <p className="display relative mt-1.5 text-xl text-white">
+          {isPersonalBest ? "🏆 自己ベスト更新!" : "今日の冒険、完了。"}
         </p>
-        <p className="num mt-3 text-5xl font-black tracking-tight">
+        <p className="num relative mt-3 text-5xl text-white">
           {formatYen(displayed)}
         </p>
+        {!isPersonalBest && (
+          <p className="relative mt-1.5 text-sm font-bold text-orange-400">{praise}</p>
+        )}
         {streak > 0 && (
           <p className="mt-4 text-base font-bold">
             <span className="anim-flame text-2xl">🔥</span>{" "}

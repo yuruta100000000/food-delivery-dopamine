@@ -46,7 +46,10 @@ export default function ProgressRing({ size, stroke, progress, children }: Props
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c * (1 - clamped)}
-          style={{ transition: "stroke-dashoffset 0.9s cubic-bezier(0.2,0.8,0.3,1)" }}
+          style={{
+            transition: "stroke-dashoffset 0.9s cubic-bezier(0.2,0.8,0.3,1)",
+            filter: "drop-shadow(0 0 6px rgba(249,115,22,0.55))",
+          }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">

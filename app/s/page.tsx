@@ -74,11 +74,9 @@ export default async function SharePage({
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-16 pt-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">シェアカード</h1>
-        <p className="mt-1 text-sm text-white/50">
-          今日の稼働を1枚のカードにしました
-        </p>
+      <header className="anim-rise mb-6">
+        <p className="kicker text-orange-400/80">SHARE YOUR RIDE</p>
+        <h1 className="display mt-1 text-3xl">今日の冒険を、世界へ。</h1>
       </header>
 
       {/* eslint-disable-next-line @next/next/no-img-element */}

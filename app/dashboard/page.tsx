@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import BottomNav from "@/components/BottomNav";
+import NumberTicker from "@/components/NumberTicker";
 import ProgressRing from "@/components/ProgressRing";
 import { PLATFORMS, type Platform } from "@/lib/shift";
 import { deleteShift, listShifts, storageMode, type Shift } from "@/lib/storage";
@@ -121,6 +122,11 @@ export default function Dashboard() {
       distance30: sumDistance(last30),
       distanceTrend: dailyDistance(shifts, today, 14),
       level: computeLevel(sumRevenue(shifts)),
+      totals: {
+        revenue: sumRevenue(shifts),
+        deliveries: shifts.reduce((a, s) => a + (s.deliveries ?? 0), 0),
+        distance: sumDistance(shifts),
+      },
     };
   }, [shifts, today]);
 
@@ -146,8 +152,9 @@ export default function Dashboard() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-28 pt-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">ダッシュボード</h1>
+      <header className="anim-rise mb-6">
+        <p className="kicker text-orange-400/80">JOURNEY LOG</p>
+        <h1 className="display mt-1 text-3xl">旅の記録</h1>
         {storageMode === "local" && (
           <p className="mt-1 text-xs text-white/30">
             記録はこの端末に保存されています
@@ -183,6 +190,34 @@ export default function Dashboard() {
 
       {shifts && shifts.length > 0 && stats && (
         <div className="space-y-4">
+          {/* 冒険の累計(オドメーター) */}
+          <div className="glass grain anim-rise relative overflow-hidden p-5">
+            <div className="stars" aria-hidden />
+            <p className="kicker relative text-white/40">TOTAL JOURNEY</p>
+            <div className="relative mt-3 grid grid-cols-3 gap-2">
+              <div>
+                <p className="num text-xl text-white">
+                  <NumberTicker value={stats.totals.revenue} format={formatYen} />
+                </p>
+                <p className="mt-0.5 text-[10px] text-white/40">総売上</p>
+              </div>
+              <div>
+                <p className="num text-xl text-white">
+                  <NumberTicker value={stats.totals.deliveries} />
+                  <span className="text-sm text-white/50">件</span>
+                </p>
+                <p className="mt-0.5 text-[10px] text-white/40">総配達</p>
+              </div>
+              <div>
+                <p className="num text-xl text-white">
+                  <NumberTicker value={Math.round(stats.totals.distance)} />
+                  <span className="text-sm text-white/50">km</span>
+                </p>
+                <p className="mt-0.5 text-[10px] text-white/40">旅した距離</p>
+              </div>
+            </div>
+          </div>
+
           {/* レベルカード */}
           <div className="glass flex items-center gap-4 p-4">
             <ProgressRing size={72} stroke={7} progress={stats.level.progress}>

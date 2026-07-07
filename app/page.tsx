@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import BottomNav from "@/components/BottomNav";
 import Celebration from "@/components/Celebration";
+import NumberTicker from "@/components/NumberTicker";
 import ProgressRing from "@/components/ProgressRing";
 import { PLATFORMS, type ParsedShift, type Platform } from "@/lib/shift";
 import { addShift, listShifts, type Shift } from "@/lib/storage";
@@ -256,7 +257,7 @@ export default function Home() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-28 pt-6">
       {/* ステータスバー: ロゴ + レベル + ストリーク */}
       <header className="mb-5 flex items-center justify-between">
-        <h1 className="text-xl font-black tracking-tight">
+        <h1 className="display text-xl">
           Deli<span className="text-grad">Log</span>
         </h1>
         <div className="flex items-center gap-2">
@@ -276,18 +277,36 @@ export default function Home() {
 
       {(status === "idle" || status === "parsing") && (
         <section className="space-y-4">
-          {/* ヒーロー: 週間目標リング */}
-          <div className="glass relative overflow-hidden p-6">
-            <div className="flex flex-col items-center">
+          {/* キャッチコピー(世界観の入口) */}
+          <div className="anim-rise px-1 pb-1 pt-2">
+            <p className="kicker text-orange-400/80">DELILOG</p>
+            <h2 className="display mt-1.5 text-[34px] text-white">
+              配達は、<span className="text-grad">冒険だ。</span>
+            </h2>
+            <p className="mt-1.5 text-xs font-medium text-white/40">
+              今夜も街へ。走った証を、ここに刻もう
+            </p>
+          </div>
+
+          {/* ヒーロー: 夜空と週間目標リング */}
+          <div className="glass grain anim-rise relative overflow-hidden p-6" style={{ animationDelay: "0.08s" }}>
+            <div className="stars" aria-hidden />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
+              style={{
+                background:
+                  "radial-gradient(ellipse 130% 100% at 50% 130%, rgba(249,115,22,0.22), transparent 65%)",
+              }}
+            />
+            <div className="relative flex flex-col items-center">
               <ProgressRing size={176} stroke={13} progress={goalProgress}>
-                <span className="text-[11px] font-bold tracking-widest text-white/45">
-                  今週
-                </span>
-                <span className="num text-3xl font-black tracking-tight">
-                  {formatYen(weekTotal)}
+                <span className="kicker text-white/45">THIS WEEK</span>
+                <span className="num mt-1 text-3xl text-white">
+                  <NumberTicker value={weekTotal} format={formatYen} />
                 </span>
                 {goal != null && (
-                  <span className="num mt-0.5 text-[11px] font-bold text-orange-400">
+                  <span className="num mt-0.5 text-[11px] text-orange-400">
                     {Math.floor(goalProgress * 100)}%
                   </span>
                 )}
@@ -372,7 +391,10 @@ export default function Home() {
           </div>
 
           {/* 記録CTA */}
-          <label className="btn-chunky btn-orange flex cursor-pointer items-center justify-center gap-3 py-5">
+          <label
+            className="btn-chunky btn-orange anim-rise flex cursor-pointer items-center justify-center gap-3 py-5"
+            style={{ animationDelay: "0.16s" }}
+          >
             <input
               ref={fileInputRef}
               type="file"
@@ -404,18 +426,21 @@ export default function Home() {
 
           {status === "parsing" && previewUrl && (
             <div className="flex justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={previewUrl}
-                alt="アップロードしたスクリーンショット"
-                className="h-28 rounded-xl border border-white/10 object-contain opacity-70"
-              />
+              <div className="scan">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt="アップロードしたスクリーンショット"
+                  className="h-36 rounded-xl border border-orange-500/30 object-contain"
+                />
+              </div>
             </div>
           )}
 
           <button
             type="button"
-            className="btn-chunky btn-ghost"
+            className="btn-chunky btn-ghost anim-rise"
+            style={{ animationDelay: "0.22s" }}
             onClick={() => {
               setForm(EMPTY_FORM);
               setNotice(null);
@@ -471,7 +496,7 @@ export default function Home() {
                     key={p.value}
                     type="button"
                     onClick={() => setForm({ ...form, platform: p.value })}
-                    className={`rounded-xl border px-2 py-2.5 text-sm transition ${
+                    className={`pressable rounded-xl border px-2 py-2.5 text-sm transition ${
                       form.platform === p.value
                         ? "border-orange-500 bg-orange-500/15 font-bold text-orange-400"
                         : "border-white/10 bg-white/5 text-white/70"
