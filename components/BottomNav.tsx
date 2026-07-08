@@ -2,31 +2,35 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { IconAperture, IconPulse } from "@/components/icons";
 
 const TABS = [
-  { href: "/", label: "記録", icon: "📸" },
-  { href: "/dashboard", label: "ダッシュボード", icon: "📊" },
+  { href: "/", label: "記録", Icon: IconAperture },
+  { href: "/dashboard", label: "旅の記録", Icon: IconPulse },
 ] as const;
 
 export default function BottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/8 bg-[#07080c]/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-md gap-2 px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        {TABS.map((tab) => {
-          const active = pathname === tab.href;
+    <nav className="hairline-t fixed inset-x-0 bottom-0 z-20 bg-[#05060a]/85 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-md px-6 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]">
+        {TABS.map(({ href, label, Icon }) => {
+          const active = pathname === href;
           return (
             <Link
-              key={tab.href}
-              href={tab.href}
-              className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-2 text-xs transition ${
-                active
-                  ? "bg-orange-500/15 font-extrabold text-orange-400"
-                  : "text-white/40"
+              key={href}
+              href={href}
+              className={`row-press flex flex-1 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-bold tracking-wider transition ${
+                active ? "text-white" : "text-white/30"
               }`}
             >
-              <span className="text-lg leading-none">{tab.icon}</span>
-              {tab.label}
+              <Icon size={20} className={active ? "text-orange-400" : ""} />
+              {label}
+              <span
+                className={`h-0.5 w-5 rounded-full transition ${
+                  active ? "bg-orange-500" : "bg-transparent"
+                }`}
+              />
             </Link>
           );
         })}

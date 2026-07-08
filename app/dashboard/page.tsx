@@ -6,6 +6,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -14,6 +15,7 @@ import {
 import BottomNav from "@/components/BottomNav";
 import NumberTicker from "@/components/NumberTicker";
 import ProgressRing from "@/components/ProgressRing";
+import { IconFlame } from "@/components/icons";
 import { PLATFORMS, type Platform } from "@/lib/shift";
 import { deleteShift, listShifts, storageMode, type Shift } from "@/lib/storage";
 import { getWeeklyGoal } from "@/lib/goal";
@@ -39,22 +41,14 @@ import {
   type TrendPoint,
 } from "@/lib/stats";
 
-// ダッシュボード: 日/週/月の売上推移、プラットフォーム別内訳、時給換算、連続稼働日数。
-// 配色は検証済みカテゴリカルパレット(dataviz手法、ダークサーフェスで6チェック通過)。
-// CVDがfloor帯のペアがあるため、内訳は必ず直接ラベル(色のみで識別させない)。
+// 旅の記録: スペックシートのように、線と数字で綴る。
+// チャートはモノクローム。「今」のバーだけが残り火色に灯る。
 
-const PLATFORM_COLORS: Record<Platform, string> = {
-  uber: "#3987e5",
-  demaecan: "#199e70",
-  menu: "#c98500",
-  rocketnow: "#008300",
-  other: "#9085e9",
-};
-
-const SERIES_1 = "#3987e5";
-const GRID = "#2c2c2a";
-const AXIS = "#383835";
-const MUTED = "#898781";
+const EMBER = "#f97316";
+const BAR = "rgba(255,255,255,0.72)";
+const BAR_DIM = "rgba(255,255,255,0.3)";
+const GRID = "rgba(255,255,255,0.06)";
+const MUTED = "rgba(255,255,255,0.32)";
 
 type Range = "day" | "week" | "month";
 
@@ -70,17 +64,19 @@ function ChartTooltip({
   active,
   payload,
   label,
+  unit,
 }: {
   active?: boolean;
   payload?: { value: number }[];
   label?: string;
+  unit?: "yen" | "km";
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-white/10 bg-[#22242a] px-3 py-2 text-xs shadow-lg">
-      <p className="text-white/50">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold text-white">
-        {formatYen(payload[0].value)}
+    <div className="rounded-lg border border-white/10 bg-[#101218] px-3 py-2 text-xs shadow-xl">
+      <p className="text-white/40">{label}</p>
+      <p className="num mt-0.5 text-sm text-white">
+        {unit === "km" ? `${payload[0].value}km` : formatYen(payload[0].value)}
       </p>
     </div>
   );
@@ -149,39 +145,44 @@ export default function Dashboard() {
   }
 
   const supportLink = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK;
+  const lastTrendIndex = trend.length - 1;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-28 pt-8">
-      <header className="anim-rise mb-6">
-        <p className="kicker text-orange-400/80">JOURNEY LOG</p>
-        <h1 className="display mt-1 text-3xl">旅の記録</h1>
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col px-6 pb-28 pt-6">
+      <div className="stars absolute inset-x-0 top-0 h-56" aria-hidden />
+
+      <header className="anim-rise relative mb-8">
+        <p className="kicker text-white/35">Journey Log</p>
+        <h1 className="display mt-1.5 text-[32px] text-white">旅の記録</h1>
         {storageMode === "local" && (
-          <p className="mt-1 text-xs text-white/30">
+          <p className="mt-1 text-[10px] text-white/20">
             記録はこの端末に保存されています
           </p>
         )}
       </header>
 
       {error && (
-        <p className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <p className="hairline-t hairline-b mb-4 py-3 text-xs text-red-300/90">
           {error}
         </p>
       )}
 
       {!shifts && !error && (
-        <p className="py-16 text-center text-sm text-white/40">読み込み中…</p>
+        <p className="py-16 text-center text-sm text-white/30">読み込み中…</p>
       )}
 
       {shifts && shifts.length === 0 && (
-        <div className="glass p-8 text-center">
-          <p className="text-3xl">📈</p>
-          <p className="mt-3 font-semibold">まだ記録がありません</p>
-          <p className="mt-1 text-sm text-white/50">
-            最初のスクショを読み取って、ここに稼働を積み上げよう
+        <div className="anim-rise py-14 text-center">
+          <p className="kicker text-white/30">No Records</p>
+          <p className="display mt-3 text-xl text-white">
+            まだ、旅は始まっていない。
+          </p>
+          <p className="mt-2 text-xs text-white/35">
+            最初のスクショを読み取って、ここに軌跡を刻もう
           </p>
           <Link
             href="/"
-            className="mt-5 inline-block rounded-xl bg-orange-500 px-6 py-3 text-sm font-bold text-white active:bg-orange-600"
+            className="btn-primary mx-auto mt-8 max-w-[240px]"
           >
             記録をはじめる
           </Link>
@@ -189,138 +190,145 @@ export default function Dashboard() {
       )}
 
       {shifts && shifts.length > 0 && stats && (
-        <div className="space-y-4">
-          {/* 冒険の累計(オドメーター) */}
-          <div className="glass grain anim-rise relative overflow-hidden p-5">
-            <div className="stars" aria-hidden />
-            <p className="kicker relative text-white/40">TOTAL JOURNEY</p>
-            <div className="relative mt-3 grid grid-cols-3 gap-2">
+        <div className="relative space-y-10">
+          {/* 冒険の累計 — スペックシート */}
+          <section className="anim-rise">
+            <p className="kicker text-white/35">Total Journey</p>
+            <div className="hairline-b mt-3 grid grid-cols-3 pb-5">
               <div>
-                <p className="num text-xl text-white">
+                <p className="num text-[22px] leading-tight text-white">
                   <NumberTicker value={stats.totals.revenue} format={formatYen} />
                 </p>
-                <p className="mt-0.5 text-[10px] text-white/40">総売上</p>
+                <p className="mt-1 text-[10px] text-white/35">総売上</p>
               </div>
-              <div>
-                <p className="num text-xl text-white">
+              <div className="border-l border-white/8 pl-4">
+                <p className="num text-[22px] leading-tight text-white">
                   <NumberTicker value={stats.totals.deliveries} />
-                  <span className="text-sm text-white/50">件</span>
+                  <span className="text-sm text-white/40">件</span>
                 </p>
-                <p className="mt-0.5 text-[10px] text-white/40">総配達</p>
+                <p className="mt-1 text-[10px] text-white/35">総配達</p>
               </div>
-              <div>
-                <p className="num text-xl text-white">
+              <div className="border-l border-white/8 pl-4">
+                <p className="num text-[22px] leading-tight text-white">
                   <NumberTicker value={Math.round(stats.totals.distance)} />
-                  <span className="text-sm text-white/50">km</span>
+                  <span className="text-sm text-white/40">km</span>
                 </p>
-                <p className="mt-0.5 text-[10px] text-white/40">旅した距離</p>
+                <p className="mt-1 text-[10px] text-white/35">旅した距離</p>
               </div>
             </div>
-          </div>
 
-          {/* レベルカード */}
-          <div className="glass flex items-center gap-4 p-4">
-            <ProgressRing size={72} stroke={7} progress={stats.level.progress}>
-              <span className="num text-xl font-black leading-none">
-                {stats.level.level}
-              </span>
-              <span className="text-[8px] font-bold tracking-widest text-white/40">
-                LV
-              </span>
-            </ProgressRing>
-            <div className="min-w-0 flex-1">
-              <p className="font-extrabold text-amber-300">{stats.level.title}</p>
-              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500"
-                  style={{ width: `${stats.level.progress * 100}%` }}
-                />
+            {/* ランク行 */}
+            <div className="mt-5 flex items-center gap-5">
+              <ProgressRing size={64} stroke={5} progress={stats.level.progress}>
+                <span className="num text-lg text-white">{stats.level.level}</span>
+              </ProgressRing>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between">
+                  <p className="text-sm font-bold text-white">
+                    <span className="kicker mr-2 text-white/35">
+                      Rank {stats.level.level}
+                    </span>
+                    {stats.level.title}
+                  </p>
+                  <p className="num text-[10px] text-white/25">
+                    next {formatYen(stats.level.toNext)}
+                  </p>
+                </div>
+                <div className="mt-2.5 h-px w-full bg-white/10">
+                  <div
+                    className="h-px bg-gradient-to-r from-orange-500 to-amber-400"
+                    style={{
+                      width: `${stats.level.progress * 100}%`,
+                      boxShadow: "0 0 8px rgba(249,115,22,0.55)",
+                    }}
+                  />
+                </div>
               </div>
-              <p className="num mt-1 text-[11px] text-white/40">
-                次のレベルまで {formatYen(stats.level.toNext)}
-              </p>
             </div>
-          </div>
+          </section>
 
-          {/* 週間目標(Studyplusの週間レポート風) */}
-          {goal != null && (
-            <div className="glass p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-white/50">今週の目標</span>
-                <span className="font-bold">
-                  {formatYen(stats.weekRevenue)}{" "}
-                  <span className="text-white/40">/ {formatYen(goal)}</span>
-                </span>
-              </div>
-              <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-700"
-                  style={{
-                    width: `${Math.min((stats.weekRevenue / goal) * 100, 100)}%`,
-                  }}
-                />
-              </div>
-              <p className="mt-1.5 text-xs font-semibold text-orange-400">
-                {stats.weekRevenue >= goal
-                  ? "🎉 達成!来週も更新しよう"
-                  : `あと ${formatYen(goal - stats.weekRevenue)}`}
-              </p>
-            </div>
-          )}
-
-          {/* サマリータイル */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="glass p-4">
-              <p className="text-xs text-white/50">今日の売上</p>
-              <p className="mt-1 text-2xl font-black tracking-tight">
-                {formatYen(stats.todayRevenue)}
-              </p>
-              {stats.todayMinutes > 0 && (
-                <p className="mt-0.5 text-xs text-white/40">
-                  {formatMinutes(stats.todayMinutes)}稼働
+          {/* 今週 — 目標との距離 */}
+          <section className="anim-rise" style={{ animationDelay: "0.08s" }}>
+            <div className="flex items-baseline justify-between">
+              <p className="kicker text-white/35">This Week</p>
+              {goal != null && (
+                <p className="num text-[11px] text-white/40">
+                  {formatYen(stats.weekRevenue)}
+                  <span className="text-white/25"> / {formatYen(goal)}</span>
                 </p>
               )}
             </div>
-            <div className="glass p-4">
-              <p className="text-xs text-white/50">連続稼働</p>
-              <p className="mt-1 text-2xl font-black tracking-tight">
-                {stats.streak > 0 ? `🔥 ${stats.streak}日` : "—"}
-              </p>
-            </div>
-            <div className="glass p-4">
-              <p className="text-xs text-white/50">今週</p>
-              <p className="mt-1 text-xl font-bold tracking-tight">
-                {formatYen(stats.weekRevenue)}
-              </p>
-            </div>
-            <div className="glass p-4">
-              <p className="text-xs text-white/50">今月</p>
-              <p className="mt-1 text-xl font-bold tracking-tight">
-                {formatYen(stats.monthRevenue)}
-              </p>
-            </div>
-          </div>
+            {goal != null ? (
+              <>
+                <div className="mt-3 h-px w-full bg-white/10">
+                  <div
+                    className="anim-bar h-px bg-orange-500"
+                    style={{
+                      width: `${Math.min((stats.weekRevenue / goal) * 100, 100)}%`,
+                      boxShadow: "0 0 8px rgba(249,115,22,0.55)",
+                    }}
+                  />
+                </div>
+                <p className="mt-2 text-[11px] text-orange-400/90">
+                  {stats.weekRevenue >= goal
+                    ? "今週の目標、達成。"
+                    : `あと ${formatYen(goal - stats.weekRevenue)}`}
+                </p>
+              </>
+            ) : (
+              <p className="mt-2 text-[11px] text-white/25">目標未設定</p>
+            )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="glass p-4">
-              <p className="text-xs text-white/50">時給換算(30日)</p>
-              <p className="num mt-1 text-xl font-bold text-orange-400">
-                {stats.hourly != null ? formatYen(stats.hourly) : "—"}
-              </p>
+            {/* 今日・今週・今月・時給・距離 */}
+            <div className="hairline-t hairline-b mt-5 grid grid-cols-3 py-4">
+              <div className="text-center">
+                <p className="text-[10px] text-white/35">今日</p>
+                <p className="num mt-1 text-[15px] text-white">
+                  {formatYen(stats.todayRevenue)}
+                </p>
+                {stats.todayMinutes > 0 && (
+                  <p className="mt-0.5 text-[9px] text-white/25">
+                    {formatMinutes(stats.todayMinutes)}
+                  </p>
+                )}
+              </div>
+              <div className="border-l border-white/8 text-center">
+                <p className="text-[10px] text-white/35">今月</p>
+                <p className="num mt-1 text-[15px] text-white">
+                  {formatYen(stats.monthRevenue)}
+                </p>
+              </div>
+              <div className="border-l border-white/8 text-center">
+                <p className="text-[10px] text-white/35">連続</p>
+                <p className="num mt-1 flex items-center justify-center gap-1 text-[15px] text-white">
+                  {stats.streak > 0 && (
+                    <IconFlame size={13} className="text-orange-400" />
+                  )}
+                  {stats.streak}日
+                </p>
+              </div>
             </div>
-            <div className="glass p-4">
-              <p className="text-xs text-white/50">走行距離(30日)</p>
-              <p className="num mt-1 text-xl font-bold">
-                {stats.distance30 > 0 ? `${stats.distance30}km` : "—"}
-              </p>
+            <div className="hairline-b grid grid-cols-2 py-4">
+              <div className="text-center">
+                <p className="text-[10px] text-white/35">時給換算(30日)</p>
+                <p className="num mt-1 text-[15px] text-white">
+                  {stats.hourly != null ? formatYen(stats.hourly) : "—"}
+                </p>
+              </div>
+              <div className="border-l border-white/8 text-center">
+                <p className="text-[10px] text-white/35">走行距離(30日)</p>
+                <p className="num mt-1 text-[15px] text-white">
+                  {stats.distance30 > 0 ? `${stats.distance30}km` : "—"}
+                </p>
+              </div>
             </div>
-          </div>
+          </section>
 
           {/* 売上推移 */}
-          <section className="glass p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">売上推移</h2>
-              <div className="flex rounded-lg bg-white/5 p-0.5">
+          <section className="anim-rise" style={{ animationDelay: "0.14s" }}>
+            <div className="mb-4 flex items-baseline justify-between">
+              <p className="kicker text-white/35">Earnings</p>
+              <div className="flex gap-4">
                 {(
                   [
                     { value: "day", label: "日" },
@@ -332,10 +340,10 @@ export default function Dashboard() {
                     key={r.value}
                     type="button"
                     onClick={() => setRange(r.value)}
-                    className={`rounded-md px-3 py-1 text-xs transition ${
+                    className={`text-xs font-bold transition ${
                       range === r.value
-                        ? "bg-white/15 font-semibold text-white"
-                        : "text-white/40"
+                        ? "text-white underline decoration-orange-500 decoration-2 underline-offset-[6px]"
+                        : "text-white/30"
                     }`}
                   >
                     {r.label}
@@ -343,21 +351,14 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
-            <div className="h-52">
+            <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={trend}
-                  margin={{ top: 4, right: 0, bottom: 0, left: 0 }}
-                >
-                  <CartesianGrid
-                    vertical={false}
-                    stroke={GRID}
-                    strokeWidth={1}
-                  />
+                <BarChart data={trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                  <CartesianGrid vertical={false} stroke={GRID} strokeWidth={1} />
                   <XAxis
                     dataKey="key"
                     tick={{ fill: MUTED, fontSize: 10 }}
-                    axisLine={{ stroke: AXIS }}
+                    axisLine={false}
                     tickLine={false}
                     interval="preserveStartEnd"
                   />
@@ -370,24 +371,26 @@ export default function Dashboard() {
                   />
                   <Tooltip
                     content={<ChartTooltip />}
-                    cursor={{ fill: "rgba(255,255,255,0.06)" }}
+                    cursor={{ fill: "rgba(255,255,255,0.05)" }}
                   />
-                  <Bar
-                    dataKey="total"
-                    fill={SERIES_1}
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={26}
-                  />
+                  <Bar dataKey="total" radius={[3, 3, 0, 0]} maxBarSize={22}>
+                    {trend.map((_, i) => (
+                      <Cell
+                        key={i}
+                        fill={range === "day" && i === lastTrendIndex ? EMBER : BAR}
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </section>
 
-          {/* 走行距離(直近14日) */}
+          {/* 走行距離 */}
           {stats.distanceTrend.some((d) => d.total > 0) && (
-            <section className="glass p-4">
-              <h2 className="mb-3 text-sm font-semibold">走行距離(直近14日)</h2>
-              <div className="h-36">
+            <section className="anim-rise" style={{ animationDelay: "0.2s" }}>
+              <p className="kicker mb-4 text-white/35">Distance — 14 Days</p>
+              <div className="h-32">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={stats.distanceTrend}
@@ -397,7 +400,7 @@ export default function Dashboard() {
                     <XAxis
                       dataKey="key"
                       tick={{ fill: MUTED, fontSize: 10 }}
-                      axisLine={{ stroke: AXIS }}
+                      axisLine={false}
                       tickLine={false}
                       interval="preserveStartEnd"
                     />
@@ -409,62 +412,55 @@ export default function Dashboard() {
                       tickLine={false}
                     />
                     <Tooltip
-                      content={({ active, payload, label }) =>
-                        active && payload?.length ? (
-                          <div className="rounded-lg border border-white/10 bg-[#22242a] px-3 py-2 text-xs shadow-lg">
-                            <p className="text-white/50">{label}</p>
-                            <p className="mt-0.5 text-sm font-semibold text-white">
-                              {payload[0].value}km
-                            </p>
-                          </div>
-                        ) : null
-                      }
-                      cursor={{ fill: "rgba(255,255,255,0.06)" }}
+                      content={<ChartTooltip unit="km" />}
+                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
                     />
-                    <Bar
-                      dataKey="total"
-                      fill="#199e70"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={26}
-                    />
+                    <Bar dataKey="total" radius={[3, 3, 0, 0]} maxBarSize={22}>
+                      {stats.distanceTrend.map((_, i) => (
+                        <Cell
+                          key={i}
+                          fill={
+                            i === stats.distanceTrend.length - 1 ? EMBER : BAR_DIM
+                          }
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </section>
           )}
 
-          {/* プラットフォーム別内訳 */}
+          {/* プラットフォーム別 */}
           {stats.breakdown.length > 0 && stats.breakdownTotal > 0 && (
-            <section className="glass p-4">
-              <h2 className="mb-3 text-sm font-semibold">
-                プラットフォーム別(直近30日)
-              </h2>
-              <ul className="space-y-3">
-                {stats.breakdown.map(({ platform, total }) => {
+            <section className="anim-rise" style={{ animationDelay: "0.26s" }}>
+              <p className="kicker mb-4 text-white/35">Platforms — 30 Days</p>
+              <ul className="space-y-4">
+                {stats.breakdown.map(({ platform, total }, idx) => {
                   const share = total / stats.breakdownTotal;
                   return (
                     <li key={platform}>
-                      <div className="mb-1 flex items-center justify-between text-sm">
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="h-2.5 w-2.5 rounded-sm"
-                            style={{ background: PLATFORM_COLORS[platform] }}
-                          />
+                      <div className="flex items-baseline justify-between text-xs">
+                        <span
+                          className={idx === 0 ? "font-bold text-white" : "text-white/55"}
+                        >
                           {PLATFORMS.find((p) => p.value === platform)?.label}
                         </span>
-                        <span className="font-semibold">
+                        <span className="num text-white/80">
                           {formatYen(total)}
-                          <span className="ml-1.5 text-xs font-normal text-white/40">
+                          <span className="ml-2 text-[10px] text-white/30">
                             {Math.round(share * 100)}%
                           </span>
                         </span>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                      <div className="mt-1.5 h-px w-full bg-white/10">
                         <div
-                          className="h-full rounded-full"
+                          className="h-px"
                           style={{
-                            width: `${Math.max(share * 100, 2)}%`,
-                            background: PLATFORM_COLORS[platform],
+                            width: `${Math.max(share * 100, 1.5)}%`,
+                            background: idx === 0 ? EMBER : "rgba(255,255,255,0.45)",
+                            boxShadow:
+                              idx === 0 ? "0 0 8px rgba(249,115,22,0.5)" : "none",
                           }}
                         />
                       </div>
@@ -478,52 +474,49 @@ export default function Dashboard() {
           {/* 今日のシェア */}
           {stats.todayRevenue > 0 && (
             <Link
-              href={`/s?dt=${today}&r=${stats.todayRevenue}&st=${stats.streak}${
+              href={`/s?dt=${today}&r=${stats.todayRevenue}&st=${stats.streak}&lv=${stats.level.level}${
                 stats.todayMinutes > 0 ? `&m=${stats.todayMinutes}` : ""
               }`}
-              className="btn-chunky btn-orange"
+              className="btn-primary anim-rise"
+              style={{ animationDelay: "0.3s" }}
             >
               今日の稼働をシェアする
             </Link>
           )}
 
-          {/* 最近の記録 */}
-          <section>
-            <h2 className="mb-2 text-xs font-medium text-white/40">最近の記録</h2>
-            <ul className="space-y-2">
+          {/* 記録一覧 */}
+          <section className="anim-rise" style={{ animationDelay: "0.34s" }}>
+            <p className="kicker mb-2 text-white/35">Records</p>
+            <ul>
               {shifts.slice(0, 10).map((s) => (
                 <li
                   key={s.id}
-                  className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm"
+                  className="hairline-b row-press flex items-center justify-between py-3.5"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                      style={{ background: PLATFORM_COLORS[s.platform] }}
-                    />
-                    <div>
-                      <p className="font-medium">
-                        {PLATFORMS.find((p) => p.value === s.platform)?.label}
-                      </p>
-                      <p className="text-xs text-white/40">
-                        {s.date}
-                        {s.deliveries != null && ` ・ ${s.deliveries}件`}
-                        {s.minutes_worked != null &&
-                          s.minutes_worked > 0 &&
-                          ` ・ ${formatMinutes(s.minutes_worked)}`}
-                        {s.distance_km != null && ` ・ ${s.distance_km}km`}
-                      </p>
-                    </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-white/85">
+                      {PLATFORMS.find((p) => p.value === s.platform)?.label}
+                    </p>
+                    <p className="num mt-0.5 text-[10px] text-white/30">
+                      {s.date.replaceAll("-", ".")}
+                      {s.deliveries != null && `・${s.deliveries}件`}
+                      {s.minutes_worked != null &&
+                        s.minutes_worked > 0 &&
+                        `・${formatMinutes(s.minutes_worked)}`}
+                      {s.distance_km != null && `・${s.distance_km}km`}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-semibold">{formatYen(s.revenue_yen)}</span>
+                  <div className="flex items-center gap-4">
+                    <span className="num text-sm text-white">
+                      {formatYen(s.revenue_yen)}
+                    </span>
                     <button
                       type="button"
                       aria-label="この記録を削除"
                       onClick={() => void handleDelete(s.id)}
-                      className="text-white/25 transition hover:text-red-400"
+                      className="px-1 text-lg leading-none text-white/15 transition hover:text-red-400"
                     >
-                      ✕
+                      ×
                     </button>
                   </div>
                 </li>
@@ -531,18 +524,16 @@ export default function Dashboard() {
             </ul>
           </section>
 
-          {/* 応援プラン(Stripe Payment Link設定時のみ) */}
+          {/* 応援 */}
           {supportLink && (
             <a
               href={supportLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="block rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4 text-center"
+              className="row-press hairline-t hairline-b block py-4 text-center"
             >
-              <p className="font-semibold text-orange-400">
-                DeliLogを応援する ☕
-              </p>
-              <p className="mt-1 text-xs text-white/50">
+              <p className="text-sm font-bold text-orange-400">DeliLogを応援する</p>
+              <p className="mt-1 text-[10px] text-white/30">
                 開発を支援して、新機能を一緒に作ろう
               </p>
             </a>

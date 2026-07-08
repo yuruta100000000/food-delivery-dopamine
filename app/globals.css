@@ -2,38 +2,46 @@
 
 :root {
   color-scheme: dark;
+  --ink-1: rgba(255, 255, 255, 0.92);
+  --ink-2: rgba(255, 255, 255, 0.58);
+  --ink-3: rgba(255, 255, 255, 0.36);
+  --ink-4: rgba(255, 255, 255, 0.2);
+  --line: rgba(255, 255, 255, 0.08);
+  --ember: #f97316;
 }
 
 /* ============================================================
-   世界観: 真夜中の都市を駆けるライダー。
-   深い夜空 + 地平線の街明かり + 走る光。
+   DeliLog — 夜の走行ログが、美しいリザルトとして立ち上がる。
+   モノクロームの夜 + ひと筋の残り火(ember)。
+   装飾は「光・数字・ヘアライン・余白」だけで構成する。
    ============================================================ */
 
 body {
-  background-color: #06070b;
+  background-color: #05060a;
   background-image:
-    radial-gradient(ellipse 90% 45% at 15% -10%, rgba(249, 115, 22, 0.13), transparent 60%),
-    radial-gradient(ellipse 70% 40% at 110% 15%, rgba(57, 135, 229, 0.09), transparent 60%);
+    radial-gradient(ellipse 90% 42% at 18% -8%, rgba(249, 115, 22, 0.075), transparent 60%),
+    radial-gradient(ellipse 70% 38% at 108% 12%, rgba(96, 165, 250, 0.05), transparent 60%);
   background-attachment: fixed;
-  color: #f2f4f6;
+  color: var(--ink-1);
   font-family: var(--font-zen), "Hiragino Sans", "Hiragino Kaku Gothic ProN",
     system-ui, sans-serif;
   font-weight: 500;
   -webkit-font-smoothing: antialiased;
 }
 
-/* 画面下部にいつも「街の灯り」が滲む地平線 */
+/* 画面下に静かに滲む街の灯り */
 .horizon {
   position: fixed;
   inset-inline: 0;
   bottom: 0;
-  height: 34vh;
+  height: 30vh;
   pointer-events: none;
   z-index: 0;
-  background:
-    radial-gradient(ellipse 120% 78% at 50% 118%, rgba(249, 115, 22, 0.16), transparent 62%),
-    radial-gradient(ellipse 60% 40% at 22% 112%, rgba(234, 88, 12, 0.1), transparent 60%),
-    radial-gradient(ellipse 55% 36% at 80% 114%, rgba(57, 135, 229, 0.07), transparent 60%);
+  background: radial-gradient(
+    ellipse 130% 82% at 50% 124%,
+    rgba(249, 115, 22, 0.1),
+    transparent 62%
+  );
 }
 
 main {
@@ -47,7 +55,7 @@ main {
   font-family: var(--font-zen), "Hiragino Sans", system-ui, sans-serif;
   font-weight: 900;
   letter-spacing: -0.02em;
-  line-height: 1.15;
+  line-height: 1.14;
 }
 
 .num {
@@ -60,48 +68,51 @@ main {
 .kicker {
   font-family: var(--font-grotesk), system-ui, sans-serif;
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.32em;
+  font-weight: 600;
+  letter-spacing: 0.34em;
   text-transform: uppercase;
 }
 
 .text-grad {
-  background: linear-gradient(135deg, #fdba74 0%, #f97316 55%, #ea580c 100%);
+  background: linear-gradient(135deg, #fdba74 0%, #f97316 60%, #ea580c 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-/* ---- サーフェス(奥行き) ---- */
+/* ---- 構造(カードではなく、線と余白) ---- */
 
-.glass {
-  position: relative;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 1.5rem;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 12px 32px rgba(0, 0, 0, 0.45);
+.hairline-t {
+  border-top: 1px solid var(--line);
+}
+.hairline-b {
+  border-bottom: 1px solid var(--line);
 }
 
-/* フィルムグレイン(質感)。ヒーローカードにだけ薄く乗せる */
+/* 残す唯一の面: フォームなど操作の器 */
+.glass {
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+}
+
 .grain::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  opacity: 0.5;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* 星空(ヒーローカード内) */
+/* 星: ページ上部の空に、ごく淡く */
 .stars,
 .stars::before,
 .stars::after {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
   pointer-events: none;
 }
 .stars::before,
@@ -110,117 +121,122 @@ main {
   background-repeat: repeat;
 }
 .stars::before {
-  background-image: radial-gradient(1.2px 1.2px at 22px 34px, rgba(255, 255, 255, 0.9), transparent 60%),
-    radial-gradient(1px 1px at 118px 12px, rgba(255, 255, 255, 0.7), transparent 60%),
-    radial-gradient(1.4px 1.4px at 72px 88px, rgba(255, 255, 255, 0.8), transparent 60%),
-    radial-gradient(1px 1px at 160px 62px, rgba(253, 186, 116, 0.9), transparent 60%),
-    radial-gradient(1px 1px at 205px 108px, rgba(255, 255, 255, 0.6), transparent 60%);
+  background-image:
+    radial-gradient(1px 1px at 22px 34px, rgba(255, 255, 255, 0.65), transparent 60%),
+    radial-gradient(0.8px 0.8px at 118px 12px, rgba(255, 255, 255, 0.45), transparent 60%),
+    radial-gradient(1.1px 1.1px at 72px 88px, rgba(255, 255, 255, 0.55), transparent 60%),
+    radial-gradient(0.8px 0.8px at 160px 62px, rgba(253, 186, 116, 0.6), transparent 60%),
+    radial-gradient(0.8px 0.8px at 205px 108px, rgba(255, 255, 255, 0.4), transparent 60%);
   background-size: 240px 140px;
-  animation: twinkle 3.2s ease-in-out infinite;
+  animation: twinkle 4.4s ease-in-out infinite;
 }
 .stars::after {
-  background-image: radial-gradient(1px 1px at 44px 110px, rgba(255, 255, 255, 0.55), transparent 60%),
-    radial-gradient(1.3px 1.3px at 140px 96px, rgba(147, 197, 253, 0.8), transparent 60%),
-    radial-gradient(1px 1px at 96px 20px, rgba(255, 255, 255, 0.65), transparent 60%),
-    radial-gradient(1.1px 1.1px at 190px 30px, rgba(255, 255, 255, 0.75), transparent 60%);
+  background-image:
+    radial-gradient(0.8px 0.8px at 44px 110px, rgba(255, 255, 255, 0.35), transparent 60%),
+    radial-gradient(1px 1px at 140px 96px, rgba(147, 197, 253, 0.45), transparent 60%),
+    radial-gradient(0.8px 0.8px at 96px 20px, rgba(255, 255, 255, 0.4), transparent 60%);
   background-size: 220px 130px;
-  animation: twinkle 4.6s ease-in-out 1.1s infinite;
+  animation: twinkle 6.2s ease-in-out 1.4s infinite;
 }
 @keyframes twinkle {
   0%,
   100% {
-    opacity: 0.35;
+    opacity: 0.3;
   }
   50% {
-    opacity: 1;
+    opacity: 0.9;
   }
 }
 
-/* ---- チャンキーボタン(押して気持ちいい) ---- */
+/* ---- 操作(触って気持ちいい、でも静かに) ---- */
 
-.btn-chunky {
-  display: block;
+.btn-primary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
   width: 100%;
-  border-radius: 1.15rem;
-  padding: 1rem;
-  text-align: center;
-  font-weight: 900;
-  font-size: 1.05rem;
-  letter-spacing: 0.02em;
+  border-radius: 0.95rem;
+  padding: 1.05rem 1rem;
+  background: linear-gradient(180deg, #fb923c, #ea580c);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 12px 44px rgba(249, 115, 22, 0.28);
   transition:
-    transform 0.07s ease,
-    box-shadow 0.07s ease,
+    transform 0.08s ease,
+    box-shadow 0.12s ease,
     filter 0.2s ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-.btn-chunky:active {
-  transform: translateY(4px) scale(0.995);
+.btn-primary:active {
+  transform: translateY(2px) scale(0.99);
+  box-shadow: 0 6px 22px rgba(249, 115, 22, 0.22);
+  filter: brightness(0.96);
 }
-.btn-chunky:disabled {
+.btn-primary:disabled {
   opacity: 0.35;
-  transform: none;
 }
 
-.btn-orange {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(180deg, #fb923c 0%, #f97316 55%, #ea580c 100%);
-  color: #fff;
-  box-shadow:
-    0 4px 0 #9a3412,
-    0 14px 40px rgba(249, 115, 22, 0.4);
+.btn-quiet {
+  display: block;
+  width: 100%;
+  border-radius: 0.95rem;
+  padding: 1rem;
+  text-align: center;
+  color: var(--ink-2);
+  font-weight: 700;
+  font-size: 0.95rem;
+  border: 1px solid var(--line);
+  transition:
+    transform 0.08s ease,
+    background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
-.btn-orange:active {
-  box-shadow:
-    0 0 0 #9a3412,
-    0 8px 22px rgba(249, 115, 22, 0.35);
-}
-.btn-orange:disabled {
-  box-shadow: 0 4px 0 #9a3412;
-}
-
-.btn-ghost {
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: 0 4px 0 rgba(255, 255, 255, 0.09);
-}
-.btn-ghost:active {
-  box-shadow: 0 0 0 rgba(255, 255, 255, 0.09);
+.btn-quiet:active {
+  transform: translateY(1px) scale(0.995);
+  background: rgba(255, 255, 255, 0.04);
 }
 
-/* 触れるカードの手応え */
-.pressable {
-  transition: transform 0.08s ease;
+.row-press {
+  transition:
+    background 0.15s ease,
+    transform 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
 }
-.pressable:active {
-  transform: scale(0.98);
+.row-press:active {
+  background: rgba(255, 255, 255, 0.035);
+  transform: scale(0.995);
+}
+
+/* 下線型インプット(面ではなく線) */
+.input-line {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0.55rem 0.1rem;
+  font-size: 1.05rem;
+  color: var(--ink-1);
+  transition: border-color 0.2s ease;
+}
+.input-line::placeholder {
+  color: var(--ink-4);
+}
+.input-line:focus {
+  outline: none;
+  border-color: rgba(249, 115, 22, 0.7);
 }
 
 /* ---- モーション ---- */
 
-@keyframes pop-in {
-  0% {
-    transform: scale(0.5);
-    opacity: 0;
-  }
-  70% {
-    transform: scale(1.08);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-.anim-pop {
-  animation: pop-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
-}
-
 @keyframes rise-in {
   0% {
-    transform: translateY(16px);
+    transform: translateY(14px);
     opacity: 0;
   }
   100% {
@@ -229,45 +245,25 @@ main {
   }
 }
 .anim-rise {
-  animation: rise-in 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  animation: rise-in 0.55s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
 
-@keyframes flame-bob {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    transform: translateY(-5px) scale(1.12);
-  }
-}
-.anim-flame {
-  display: inline-block;
-  animation: flame-bob 1.1s ease-in-out infinite;
-}
-
-@keyframes confetti-fall {
+@keyframes pop-in {
   0% {
-    transform: translateY(-8vh) rotate(0deg);
-    opacity: 1;
-  }
-  85% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(105vh) rotate(680deg);
+    transform: scale(0.6);
     opacity: 0;
   }
+  70% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
-.confetti {
-  position: fixed;
-  top: 0;
-  width: 10px;
-  height: 14px;
-  border-radius: 2px;
-  pointer-events: none;
-  z-index: 50;
-  animation: confetti-fall 2.6s ease-in both;
+.anim-pop {
+  animation: pop-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
 }
 
 @keyframes bar-fill {
@@ -276,10 +272,37 @@ main {
   }
 }
 .anim-bar {
-  animation: bar-fill 0.9s ease-out both;
+  animation: bar-fill 1s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
 
-/* レベルアップ: 光の帯 */
+/* 残り火: 画面下からゆっくり立ちのぼる光の粒 */
+@keyframes ember-rise {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-58vh) translateX(var(--drift, 8px));
+    opacity: 0;
+  }
+}
+.ember {
+  position: fixed;
+  bottom: 8vh;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: #fdba74;
+  box-shadow: 0 0 8px 2px rgba(249, 115, 22, 0.45);
+  pointer-events: none;
+  z-index: 40;
+  animation: ember-rise 3.4s ease-out both;
+}
+
+/* ランクアップ: 光の帯 */
 @keyframes shine-sweep {
   0% {
     transform: translateX(-120%) skewX(-18deg);
@@ -293,25 +316,12 @@ main {
   position: absolute;
   inset: 0;
   width: 45%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
-  animation: shine-sweep 1.6s ease-in-out 0.4s 2;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  animation: shine-sweep 1.8s ease-in-out 0.5s 2;
   pointer-events: none;
 }
 
-@keyframes glow-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 40px rgba(249, 115, 22, 0.25);
-  }
-  50% {
-    box-shadow: 0 0 90px rgba(249, 115, 22, 0.55);
-  }
-}
-.anim-glow {
-  animation: glow-pulse 1.8s ease-in-out infinite;
-}
-
-/* AI読み取り中のスキャンライン(プレビュー画像の上を走る) */
+/* AI読み取り: スキャンライン */
 .scan {
   position: relative;
   overflow: hidden;
@@ -326,9 +336,9 @@ main {
   background: linear-gradient(
     180deg,
     transparent,
-    rgba(249, 115, 22, 0.25) 45%,
-    rgba(253, 186, 116, 0.85) 50%,
-    rgba(249, 115, 22, 0.25) 55%,
+    rgba(249, 115, 22, 0.18) 45%,
+    rgba(253, 186, 116, 0.75) 50%,
+    rgba(249, 115, 22, 0.18) 55%,
     transparent
   );
   animation: scan-sweep 1.5s ease-in-out infinite;
@@ -343,12 +353,10 @@ main {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim-pop,
   .anim-rise,
-  .anim-flame,
-  .confetti,
+  .anim-pop,
   .anim-bar,
-  .anim-glow,
+  .ember,
   .stars::before,
   .stars::after {
     animation: none;

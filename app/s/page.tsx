@@ -92,7 +92,7 @@ export default async function SharePage({
         href={intentUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="btn-chunky btn-orange mt-6"
+        className="btn-primary mt-6"
       >
         Xにポストする
       </a>

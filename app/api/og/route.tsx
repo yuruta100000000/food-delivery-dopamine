@@ -82,15 +82,16 @@ export async function GET(req: NextRequest) {
               <div
                 style={{
                   display: "flex",
-                  fontSize: 24,
+                  fontSize: 22,
                   fontWeight: 700,
-                  color: "#fbbf24",
-                  border: "2px solid rgba(251,191,36,0.4)",
+                  letterSpacing: 4,
+                  color: "rgba(253,186,116,0.85)",
+                  border: "1px solid rgba(253,186,116,0.3)",
                   borderRadius: 999,
-                  padding: "4px 18px",
+                  padding: "6px 20px",
                 }}
               >
-                LV.{level}
+                RANK {level}
               </div>
             )}
           </div>
