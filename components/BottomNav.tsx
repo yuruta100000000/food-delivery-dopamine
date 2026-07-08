@@ -2,25 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconAperture, IconPulse } from "@/components/icons";
+import { IconAperture, IconFeed, IconPulse, IconRider } from "@/components/icons";
 
 const TABS = [
-  { href: "/", label: "記録", Icon: IconAperture },
-  { href: "/dashboard", label: "旅の記録", Icon: IconPulse },
+  { href: "/timeline", label: "タイムライン", Icon: IconFeed },
+  { href: "/", label: "記録する", Icon: IconAperture },
+  { href: "/report", label: "レポート", Icon: IconPulse },
+  { href: "/me", label: "マイページ", Icon: IconRider },
 ] as const;
 
 export default function BottomNav() {
   const pathname = usePathname();
   return (
     <nav className="hairline-t fixed inset-x-0 bottom-0 z-20 bg-[#05060a]/85 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-md px-6 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]">
+      <div className="mx-auto flex max-w-md px-2 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]">
         {TABS.map(({ href, label, Icon }) => {
           const active = pathname === href;
           return (
             <Link
               key={href}
               href={href}
-              className={`row-press flex flex-1 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-bold tracking-wider transition ${
+              className={`row-press flex flex-1 flex-col items-center gap-1 rounded-xl py-2 text-[9px] font-bold tracking-wider transition ${
                 active ? "text-white" : "text-white/30"
               }`}
             >

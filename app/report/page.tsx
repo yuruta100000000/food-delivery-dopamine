@@ -15,6 +15,7 @@ import {
 import BottomNav from "@/components/BottomNav";
 import NumberTicker from "@/components/NumberTicker";
 import ProgressRing from "@/components/ProgressRing";
+import RevenueCalendar from "@/components/RevenueCalendar";
 import { IconFlame } from "@/components/icons";
 import { PLATFORMS, type Platform } from "@/lib/shift";
 import { deleteShift, listShifts, storageMode, type Shift } from "@/lib/storage";
@@ -152,8 +153,8 @@ export default function Dashboard() {
       <div className="stars absolute inset-x-0 top-0 h-56" aria-hidden />
 
       <header className="anim-rise relative mb-8">
-        <p className="kicker text-white/35">Journey Log</p>
-        <h1 className="display mt-1.5 text-[32px] text-white">旅の記録</h1>
+        <p className="kicker text-white/35">Report</p>
+        <h1 className="display mt-1.5 text-[32px] text-white">走った証</h1>
         {storageMode === "local" && (
           <p className="mt-1 text-[10px] text-white/20">
             記録はこの端末に保存されています
@@ -322,6 +323,11 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
+          </section>
+
+          {/* 売上カレンダー: 走った夜が街の灯りのように浮かぶ */}
+          <section className="anim-rise" style={{ animationDelay: "0.12s" }}>
+            <RevenueCalendar shifts={shifts} />
           </section>
 
           {/* 売上推移 */}

@@ -73,3 +73,27 @@ export function IconRoute({ size = 20, className }: IconProps) {
     </svg>
   );
 }
+
+/* フィード(タイムライン) */
+export function IconFeed({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <circle cx="5" cy="6" r="1.6" />
+      <path d="M9.5 6H20" />
+      <circle cx="5" cy="12" r="1.6" />
+      <path d="M9.5 12H20" />
+      <circle cx="5" cy="18" r="1.6" />
+      <path d="M9.5 18H20" />
+    </svg>
+  );
+}
+
+/* ライダー(マイページ) */
+export function IconRider({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <circle cx="12" cy="8" r="3.4" />
+      <path d="M5 19.5c.8-3.6 3.6-5.6 7-5.6s6.2 2 7 5.6" />
+    </svg>
+  );
+}
