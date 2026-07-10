@@ -19,7 +19,42 @@ const SUPPORTED_MEDIA_TYPES = [
 // 精度と費用のバランスはモデルで調整する。Vercelの環境変数 OPENAI_MODEL で差し替え可能
 const DEFAULT_MODEL = "gpt-4.1-mini";
 
+// ---- 濫用対策(2026-07-10 セキュリティパス) ----
+// このAPIは1回ごとにOpenAIの費用が発生するため、無認証の連打からクレジットを守る。
+// スマホのスクショは実測1〜3MB程度 → 8MBあれば正当な利用を弾かない。
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+// IP別レート制限(サーバーレスのインスタンス内メモリなのでベストエフォート。
+// インスタンスが分かれると別カウントになるが、単一IPからの連打には効く)
+const RATE_LIMIT_MAX = 10; // 回 / 窓
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  // 肥大防止: 窓が過ぎたエントリを時々掃除する
+  if (rateBuckets.size > 1000) {
+    for (const [k, v] of rateBuckets) if (v.resetAt < now) rateBuckets.delete(k);
+  }
+  const bucket = rateBuckets.get(ip);
+  if (!bucket || bucket.resetAt < now) {
+    rateBuckets.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  bucket.count += 1;
+  return bucket.count > RATE_LIMIT_MAX;
+}
+
 export async function POST(req: NextRequest) {
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (isRateLimited(ip)) {
+    return NextResponse.json(
+      { error: "解析リクエストが多すぎます。1分ほど待ってから再試行してください。" },
+      { status: 429 },
+    );
+  }
+
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
       {
@@ -43,6 +78,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "画像が送信されていません。" },
       { status: 400 },
+    );
+  }
+
+  if (file.size > MAX_IMAGE_BYTES) {
+    return NextResponse.json(
+      {
+        error: `画像が大きすぎます(上限${MAX_IMAGE_BYTES / 1024 / 1024}MB)。スクショをそのままアップロードしてください。`,
+      },
+      { status: 413 },
     );
   }
 
