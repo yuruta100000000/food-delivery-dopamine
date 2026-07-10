@@ -1,5 +1,6 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Platform } from "@/lib/shift";
+import { getSupabaseBrowser, supabaseConfigured } from "@/lib/supabase-client";
 
 // 稼働記録の保存レイヤー(クライアント側)。
 // NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY が設定されていれば
@@ -20,11 +21,9 @@ export type Shift = {
 
 export type ShiftInput = Omit<Shift, "id" | "created_at">;
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-export const storageMode: "supabase" | "local" =
-  SUPABASE_URL && SUPABASE_ANON_KEY ? "supabase" : "local";
+export const storageMode: "supabase" | "local" = supabaseConfigured
+  ? "supabase"
+  : "local";
 
 // ---- localStorage 実装 ----
 
@@ -48,13 +47,10 @@ function localSave(shifts: Shift[]) {
 
 // ---- Supabase 実装 ----
 
-let supabase: SupabaseClient | null = null;
-
 function getSupabase(): SupabaseClient {
-  if (!supabase) {
-    supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
-  }
-  return supabase;
+  const client = getSupabaseBrowser();
+  if (!client) throw new Error("Supabaseが未設定です。");
+  return client;
 }
 
 // 匿名ログイン(SupabaseダッシュボードでAnonymous sign-insを有効化しておくこと)
@@ -65,6 +61,29 @@ async function ensureSession(client: SupabaseClient): Promise<void> {
   if (error) throw new Error(`匿名ログインに失敗しました: ${error.message}`);
 }
 
+// この端末のlocalStorageに残っている記録をSupabaseへ1回だけ移行する。
+// (Supabase未設定期間に貯めた記録を、接続後に失わないため)
+// 移行後もlocalStorage側はバックアップとして残す。
+const MIGRATED_KEY = "delilog.migrated.v1";
+
+async function migrateLocalToSupabase(client: SupabaseClient): Promise<void> {
+  if (typeof window === "undefined") return;
+  if (window.localStorage.getItem(MIGRATED_KEY)) return;
+  const locals = localList();
+  if (locals.length === 0) {
+    window.localStorage.setItem(MIGRATED_KEY, new Date().toISOString());
+    return;
+  }
+  const rows = locals.map(({ id: _id, created_at: _c, ...input }) => input);
+  const { error } = await client.from("shifts").insert(rows);
+  if (error) {
+    // 失敗したら次回また試す(マーカーを書かない)
+    console.error("[storage] local→supabase移行に失敗:", error.message);
+    return;
+  }
+  window.localStorage.setItem(MIGRATED_KEY, new Date().toISOString());
+}
+
 // ---- 公開API ----
 
 export async function listShifts(): Promise<Shift[]> {
@@ -73,6 +92,7 @@ export async function listShifts(): Promise<Shift[]> {
   }
   const client = getSupabase();
   await ensureSession(client);
+  await migrateLocalToSupabase(client);
   const { data, error } = await client
     .from("shifts")
     .select("id, date, platform, revenue_yen, deliveries, minutes_worked, distance_km, source, created_at")
