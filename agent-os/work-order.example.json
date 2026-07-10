@@ -1,0 +1,10 @@
+{
+  "action": "execute",
+  "item": "解析失敗時の手動フォーム導線の文言をわかりやすくする",
+  "skill": "improve-upload-flow",
+  "spec": "app/page.tsx の解析失敗notice文言を、次に何をすべきか1文で伝わる形に改善する。UIレイアウトは変えない。",
+  "done_when": [
+    "app/page.tsx に失敗理由と次アクションを含むnoticeが表示される",
+    "agent-os/guardrails/verify.sh passes"
+  ]
+}

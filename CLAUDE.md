@@ -53,3 +53,58 @@
 ## 判断に迷ったら
 
 「その実装は、8/4までに配達員から1円もらうために必要か?」で判断する。Noなら書かない。
+
+---
+
+# Agentic OS 憲法(2026-07-09追加)
+
+詳細は `agent-os/` 以下(ENGINE.md / contract.md / RUNBOOK.md)。ここは法律だけ。
+
+## NEVER
+- Never expand scope beyond the 2026-08-04 first-paid-user goal unless explicitly approved.
+- Never add features outside screenshot import, dashboard, and share card before first revenue.
+- Never implement scraping or automated platform login.
+- Never touch auth, billing, Supabase schema, migrations, production config, or storage policy unattended.
+- Never add a dependency without proposing it first.
+- Never store unnecessary personal information from screenshots.
+- Never report work as done without verification.
+- Never edit, weaken, or delete tests to make a task pass.
+- Never enable cron, auto-merge, auto-deploy, or auto-payment flows without human approval.
+- Never echo or explain internal reasoning in response text(Fable 5のreasoning_extraction refusalを誘発する).
+
+## DISPATCH
+ルーティング詳細は `agent-os/ENGINE.md` の Model Dispatch。要点:
+1. 判断・レビュー・standoff → top reasoning model(read-only)
+2. 実装・テスト → worker(Sonnet級)
+3. triage・分類 → cheap model
+4. 最終判定 → bash(`agent-os/guardrails/verify.sh`)。モデルの自己申告は完了ではない
+ルーティングは `agent-os/memory/dispatch.tsv` に記録する。
+
+## WORDS
+- 「done」= predicateが通ること。それ以外の何物でもない
+- 「small」= 変更200行未満 /「large」= 400行以上(→人間レビュー必須)
+- 「cleanup」= 挙動同一、前後でverify.sh green
+- 「MVP範囲」= スクショ取り込み・ダッシュボード(レポート)・シェアカード・刺激レイヤー(CLAUDE.md上部のスコープ定義)
+
+## AUTONOMY
+AI should not wait for human input on reversible implementation choices.
+If the task is within MVP scope, technically reversible, and verifiable, proceed.
+Log assumptions in `agent-os/memory/STATE.md` or `agent-os/HUMAN_DECISIONS_DRAFT.md`.
+The human should only be required for irreversible, high-risk, or business-critical decisions.
+境界の具体リストは `agent-os/contract.md`(acts alone / queues for me / wakes me up)。
+
+## DONE
+<!-- HUMAN_DECISION_DRAFT: 完了定義。あとで人間が修正する -->
+Done means:
+1. The requested behavior is implemented.
+2. The implementation stays inside the MVP scope.
+3. `agent-os/guardrails/verify.sh` passes.
+4. No forbidden area was touched.
+5. User-visible changes are checked for mobile-first behavior.
+6. Any assumption made without asking is logged.
+7. Any unfinished or unverified part is explicitly marked.
+
+## HUMAN_DECISION_DRAFT
+人間が本来決めるべき判断をAIが仮置きした場合、必ず
+`agent-os/HUMAN_DECISIONS_DRAFT.md` に「仮置き/理由/修正するなら」を追記する。
+オーナーはそのファイルだけ読めば全仮置きを修正できる状態を維持する。
