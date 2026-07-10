@@ -81,10 +81,15 @@
 理由: 凍結を「気持ち」でなくstanding goal(08/09)で機械検証できる形にしないと、改善という名の機能追加が再発する(オーナーの過去5回の燃え尽きパターン)。
 修正するなら: agent-os/goals/routes.allowlist・deps.allowlist を編集(追加を許可する時)。5種の許可リストを変えるなら CLAUDE.md「ローンチモード」の定義とcontract.mdを同時に。
 
+## 17. W3/W4実装の仮置き(2026-07-10 オーナー指示による実装)
+仮置き: ①ログインUIは新画面を作らず/me内に設置(機能凍結のroutes.allowlist維持)②匿名→Googleは linkIdentity で同一IDのまま昇格(Supabase側で要Manual Linking)③localStorageの記録は接続後の初回読み込みで自動移行(1回だけ・元データはバックアップとして残す)④プロフィール・週間目標はlocalStorageのまま(profilesテーブルは作らない=実フィード公開まで不要)⑤課金はStripe Payment Link。URLを env `NEXT_PUBLIC_STRIPE_PAYMENT_LINK` で注入し、**未設定の間はカード非表示**=価格と文言をオーナーが承認するまで何も公開されない ⑥/api/parse はIP別10回/分+画像8MB上限。
+理由: すべて「コードは先に完成させ、公開のスイッチ(env設定・ダッシュボード操作)はオーナーの手に残す」形。不可逆な操作(スキーマ適用・OAuth設定・決済リンク発行)は supabase/SETUP.md の手順としてオーナーに委ねた。
+修正するなら: サポーター文言は app/me/page.tsx のSupport節。レート制限値は app/api/parse/route.ts の RATE_LIMIT_*。profilesテーブルが必要になったら schema.sql への追加を人間承認で。
+
 ## 15. Remaining Human Decisions
 まだ人間が決めるべきこと:
-- **価格**: 先行課金の金額(例: ¥500買い切り? ¥300/月?)と、何を約束して売るか。draft-payment-ask-copyはこれが決まらないと最終化できない
-- **Supabase本番化のタイミング**: 現在localStorageフォールバック運用。タイムラインを本物にするにはauth+schema適用が必要で、これは無人変更禁止領域
-- **Stripe Payment Linkの作成**: 決済リンク発行はオーナーのStripeアカウントでしかできない(W4予定)
+- **価格**: 先行課金の金額(例: ¥500買い切り? ¥300/月?)と、何を約束して売るか。サポーターカードの文言最終承認もセット
+- **supabase/SETUP.md の実行**: Supabaseプロジェクト作成→schema適用→Google OAuth→Vercel環境変数(約30分。手順書は用意済み)
+- **Stripe Payment Linkの作成**: 商品・価格を作ってURLを `NEXT_PUBLIC_STRIPE_PAYMENT_LINK` に設定(設定するまでカードは出ない)
+- **OpenAIのUsage limits設定**: レート制限はベストエフォートのため、OpenAI側の月額上限が最後の防波堤(docs/SECURITY.md参照)
 - **最初の10人の配達員に会う方法**: X/現場/知人。プロダクトでなく営業の判断
-- **OpenAIクレジットの残高管理**: 解析1回あたりのコスト実測と、ユーザー増加時の上限設定

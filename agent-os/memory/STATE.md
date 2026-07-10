@@ -24,3 +24,9 @@
 - オーナー判断: 現状(タイムライン等MVP超過分を含む)で機能面を凍結し、ローンチに向かう。
 - 実装: CLAUDE.md「機能凍結」節+NEVER 2本追加 / contract.md全面改訂 / goals 08-routes-frozen・09-deps-frozen(allowlist方式) / skills共通ルール。
 - ASSUMPTION: 許可される変更を「バグ修正/解析精度/表示崩れ/文言/速度」の5種に限定した。凍結解除はallowlistの人間編集を証跡とする。
+
+## 2026-07-10 W3/W4実装(オーナー指示: DB・認証・課金・セキュリティ・磨き込み)
+- 実装: lib/supabase-client.ts(共有クライアント)/ lib/auth.ts(Google OAuth+匿名linkIdentity昇格)/ storage.tsにlocalStorage→Supabase自動移行 / /meにAccount・Support節 / next.configセキュリティヘッダー / /api/parseレート制限+サイズ上限 / supabase/SETUP.md / docs/SECURITY.md
+- ASSUMPTION: 詳細は HUMAN_DECISIONS_DRAFT.md #17。公開スイッチ(env設定・ダッシュボード操作)は全てオーナーの手に残した。
+- 事故: コンテナ再作成でローカルgitがコミット済み履歴ごと巻き戻り+未コミットのlib 2ファイル消失 → originから復元(stash -u + ff-merge、破壊的コマンド不使用)。**教訓: コミット単位を細かく・こまめにpush**(開発ルール通り)。
+- 検証: build/typecheck pass、390pxで4タブとも水平オーバーフロー0、/meのAccount節表示確認(スクショ)。
