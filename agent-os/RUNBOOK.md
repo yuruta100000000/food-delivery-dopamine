@@ -31,3 +31,8 @@ make audit     # dispatch履歴に不審な動きがないか
 ## 絶対にやらないこと(CLAUDE.md NEVER)
 cron自動tick / auto-PR / auto-merge / auto-deploy / auth・billing・schema無人変更 /
 スクレイピング / スコープ外機能。これらは「便利そう」でも8/4ゴールに寄与しない。
+
+## ローンチモード(2026-07-10〜)
+機能は凍結済み(goals 08/09が番人)。tickに渡してよい仕事は
+**バグ修正/解析精度/表示崩れ/文言/速度** と、W3(Supabase・同席)/W4(Stripe・承認)の準備だけ。
+「この機能があれば売れるのでは」と思ったら、それは営業から逃げているサイン。CLAUDE.md冒頭を読み直す。

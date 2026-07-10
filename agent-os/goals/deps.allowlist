@@ -1,0 +1,14 @@
+@supabase/supabase-js
+@tailwindcss/postcss
+@types/node
+@types/react
+@types/react-dom
+next
+openai
+postcss
+react
+react-dom
+recharts
+tailwindcss
+typescript
+zod

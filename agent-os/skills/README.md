@@ -2,6 +2,11 @@
 
 各skillは1ディレクトリ+SKILL.md。trust台帳(memory/trust.tsv)がtierを決める。
 
+## 機能凍結下の共通ルール(2026-07-10、全skillに優先適用)
+- `improve-*` 系skillの許容範囲は **バグ修正/解析精度/表示崩れ/文言/速度** のみ
+- 新規UI要素・新規メカニクス・新route・新依存を生む出力は、tierに関係なくfail扱いで破棄
+- 迷ったら routes-frozen / deps-frozen goal が通るかで機械判定する
+
 <!-- HUMAN_DECISION_DRAFT: trust昇格条件 -->
 ## Tierルール
 - watch:

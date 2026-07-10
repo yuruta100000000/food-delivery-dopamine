@@ -27,6 +27,24 @@
 - ネイティブアプリ化(まずWeb) / 自動スクレイピング・アプリ連携(規約リスク、絶対にやらない) / 経費・確定申告機能(Phase 2) / ランキング・コミュニティ(Phase 2) / 多言語対応
 - GPS自動走行距離記録(Phase 2・ネイティブ化とセット。Webはバックグラウンドで位置取得が止まるため成立しない)
 
+## 機能凍結(2026-07-10 オーナー判断・ローンチモード)
+
+**今ある機能面が最終形。初売上まで機能は1つも増やさない。**
+現状は既にMVPを超えている(タイムライン前倒し等)。ここからは「増やす」ではなく「磨いて売る」。
+
+- 画面は現状で凍結: `/`(記録)・`/timeline`・`/report`・`/me`・`/s`(シェア)+ `/api/parse`・`/api/og`。新route・新タブ・新画面の追加禁止(`agent-os/goals/routes.allowlist` が機械検証)
+- 依存パッケージも凍結(`agent-os/goals/deps.allowlist`)。追加は必ず事前提案
+- ゲーミフィケーション(レベル・称号・実績・演出)は現状の仕様のまま。新メカニクス追加禁止
+- タイムラインはβプレビューのまま凍結。実フィード化(Supabase接続)はオーナー同席のW3判断
+- 既存機能の削除もしない(オーナーが残すと判断済み)。やってよいのは**バグ修正・解析精度・表示崩れ・文言・速度**だけ
+
+### ローンチまでの残作業(これ以外やらない)
+1. 解析精度: 実スクショの失敗ケース収集→プロンプト改善(parse_logsを見る)
+2. 実機仕上げ: iPhone実機での表示崩れ・操作性の修正
+3. W3: Supabase接続(auth/schema適用。**オーナー同席必須**)
+4. W4: Stripe Payment Link+課金打診文言(**オーナー承認必須**)
+5. 獲得: シェアカード→X導線の磨き込み。最初の10人への声かけはオーナーの仕事
+
 ## 技術スタック(変更しない)
 
 - Next.js (App Router) + TypeScript + Tailwind CSS
@@ -71,6 +89,8 @@
 - Never edit, weaken, or delete tests to make a task pass.
 - Never enable cron, auto-merge, auto-deploy, or auto-payment flows without human approval.
 - Never echo or explain internal reasoning in response text(Fable 5のreasoning_extraction refusalを誘発する).
+- Never add a new route, tab, or screen after the 2026-07-10 feature freeze(`goals/routes.allowlist`).
+- Never add new gamification mechanics, feed features, data model entities, or npm dependencies before first revenue(`goals/deps.allowlist`).
 
 ## DISPATCH
 ルーティング詳細は `agent-os/ENGINE.md` の Model Dispatch。要点:
@@ -85,6 +105,7 @@
 - 「small」= 変更200行未満 /「large」= 400行以上(→人間レビュー必須)
 - 「cleanup」= 挙動同一、前後でverify.sh green
 - 「MVP範囲」= スクショ取り込み・ダッシュボード(レポート)・シェアカード・刺激レイヤー(CLAUDE.md上部のスコープ定義)
+- 「ローンチモード」(2026-07-10〜)= 機能凍結下の運転。許可される変更は バグ修正/解析精度/表示崩れ/文言/速度 の5種のみ。「改善」はこの5種に翻訳できなければ却下
 
 ## AUTONOMY
 AI should not wait for human input on reversible implementation choices.
