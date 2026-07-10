@@ -21,9 +21,20 @@ import {
 } from "@/lib/profile";
 import { MILESTONES, aggregate, computeLevel, unlockedIds } from "@/lib/level";
 import { computeStreak, formatYen, sumRevenue, todayIso } from "@/lib/stats";
+import {
+  getAuthState,
+  onAuthChange,
+  signInWithGoogle,
+  signOutUser,
+  type AuthState,
+} from "@/lib/auth";
 
 // マイページ: 配達員としての活動履歴が積み上がる公開プロフィール(の原型)。
 // Supabase接続後は他ユーザーから見られる前提の構成。
+
+// 先行課金(W4): Stripe Payment LinkのURLを環境変数で注入する。
+// 未設定の間はカード自体を表示しない=オーナーがリンクを作るまで何も公開されない。
+const SUPPORT_LINK = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK;
 
 export default function MyPage() {
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -32,6 +43,9 @@ export default function MyPage() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Profile>(DEFAULT_PROFILE);
   const [goalDraft, setGoalDraft] = useState("");
+  const [auth, setAuth] = useState<AuthState | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const today = todayIso();
 
@@ -43,7 +57,38 @@ export default function MyPage() {
     setProfile(p);
     setDraft(p);
     setGoal(getWeeklyGoal());
+    getAuthState().then(setAuth);
+    // OAuthリダイレクトからの帰着やログアウトで状態を追従させる
+    const unsubscribe = onAuthChange(() => {
+      getAuthState().then(setAuth);
+      listShifts().then(setShifts).catch(() => {});
+    });
+    return unsubscribe;
   }, []);
+
+  async function handleGoogleLogin() {
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      await signInWithGoogle(); // 成功時はOAuthへリダイレクトする
+    } catch (e) {
+      setAuthError(e instanceof Error ? e.message : "ログインに失敗しました。");
+      setAuthBusy(false);
+    }
+  }
+
+  async function handleLogout() {
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      await signOutUser();
+      setAuth(await getAuthState());
+    } catch (e) {
+      setAuthError(e instanceof Error ? e.message : "ログアウトに失敗しました。");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
 
   const agg = useMemo(() => aggregate(shifts, today), [shifts, today]);
   const level = computeLevel(agg.totalRevenue);
@@ -375,6 +420,90 @@ export default function MyPage() {
               })}
             </ul>
           </section>
+
+          {/* アカウント(ログインは新画面を作らずここに置く=機能凍結) */}
+          <section className="anim-rise" style={{ animationDelay: "0.3s" }}>
+            <p className="kicker text-white/35">Account</p>
+            <div className="hairline-t hairline-b mt-3 py-4">
+              {auth === null ? (
+                <p className="text-xs text-white/30">確認中…</p>
+              ) : auth.mode === "local" ? (
+                <div>
+                  <p className="text-sm font-bold text-white">この端末に保存中</p>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-white/40">
+                    記録はこの端末のブラウザにだけ残っています。
+                    クラウド保存とログインは、サーバー接続の公開と同時に使えるようになります。
+                  </p>
+                </div>
+              ) : auth.mode === "anonymous" ? (
+                <div>
+                  <p className="text-sm font-bold text-white">
+                    ゲストとして記録中
+                    <span className="ml-2 text-[10px] font-normal text-white/35">
+                      クラウド保存
+                    </span>
+                  </p>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-white/40">
+                    記録はクラウドに保存されていますが、端末を替えると引き継げません。
+                    Googleでログインすると、この記録をそのまま引き継げます。
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={authBusy}
+                    className="row-press mt-3.5 w-full rounded-full border border-white/15 py-2.5 text-xs font-bold text-white/85 disabled:opacity-40"
+                  >
+                    {authBusy ? "リダイレクト中…" : "Googleでログインして記録を守る"}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-white">ログイン済み</p>
+                    <p className="mt-0.5 truncate text-[11px] text-white/40">
+                      {auth.email ?? "Googleアカウント"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    disabled={authBusy}
+                    className="row-press shrink-0 rounded-full border border-white/12 px-4 py-1.5 text-[11px] font-bold text-white/50 disabled:opacity-40"
+                  >
+                    ログアウト
+                  </button>
+                </div>
+              )}
+              {authError && (
+                <p className="mt-2 text-[11px] text-red-400/80">{authError}</p>
+              )}
+            </div>
+          </section>
+
+          {/* 先行サポーター(Payment Link未設定なら非表示) */}
+          {SUPPORT_LINK && (
+            <section className="anim-rise" style={{ animationDelay: "0.36s" }}>
+              <p className="kicker text-white/35">Support</p>
+              <div className="hairline-t hairline-b mt-3 py-4">
+                <p className="text-sm font-bold text-white">先行サポーターになる</p>
+                <p className="mt-1.5 text-[11px] leading-relaxed text-white/40">
+                  DeliLogは配達員のためのアプリとして、まだ走り出したばかりです。
+                  開発を支えてくれる最初のサポーターを募集しています。
+                </p>
+                <a
+                  href={SUPPORT_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary mt-3.5 block text-center"
+                >
+                  サポーターになる
+                </a>
+                <p className="mt-2 text-center text-[10px] text-white/25">
+                  Stripeの安全な決済ページに移動します
+                </p>
+              </div>
+            </section>
+          )}
 
           <p className="pb-2 text-center text-[10px] leading-relaxed text-white/20">
             このプロフィールは、正式公開後に他のライダーから見られるようになります
